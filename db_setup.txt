@@ -1,0 +1,23 @@
+CREATE TABLE block (
+    block INTEGER
+);
+
+CREATE TABLE stakes (
+    user TEXT
+    token TEXT
+    amount INTEGER
+    type TEXT
+    start INTEGER
+    due INTEGER
+    processed INTEGER
+    status TEXT
+    block INTEGER
+);
+
+CREATE TABLE receipts (
+    nonce INTEGER
+    now INTEGER
+    msg TEXT
+);
+
+INSERT INTO block (block) VALUES (59120000);
