@@ -6,9 +6,10 @@ BitShares Management Group Co. Ltd.
 
 # STANDARD IMPORTS
 import datetime
+from sqlite3 import connect as sql
 
 # PYBITSHARES IMPORTS
-from stake_bitshares import pybitshares_reconnect, new_stake
+from stake_bitshares import pybitshares_reconnect, stake_start
 
 # STAKEBTS IMPORTS
 from preexisting_contracts import STAKES
@@ -82,12 +83,10 @@ def add_block_num(stake_matrix):
     return stake_matrix
 
 
-def mark_prepaid_stakes(stake_matrix):
+def mark_prepaid_stakes(stake_matrix, con):
     """
     make database changes to mark payments prepaid as "paid" with appropriate munix
     """
-    # open stake_bitshares.db
-    con = sql(DB)
     cur = con.cursor()
     # search through our prepaid stake matrix for payments already made
     for stake in stake_matrix:
@@ -98,50 +97,63 @@ def mark_prepaid_stakes(stake_matrix):
         if prepaid == 1:
             block = convert_munix_to_block(JULY31)
             query = (
-                f"UPDATE stakes WHERE user={user} "
-                + f"AND (type=interest) AND status=pending AND number=1"
-                + f"SET (status=paid, block={block}, processed={JULY31})"
+                "UPDATE stakes WHERE user=? "
+                + "AND (type=interest) AND status=pending AND number=1"
+                + "SET (status=paid, block=?, processed=?)"
             )
-            cur.execute(query)
+            values = (
+                user,
+                block,
+                JULY31,
+            )
+            cur.execute(query, values)
         # handle cases where two payments have been sent already
         if prepaid == 2:
             block = convert_munix_to_block(JUNE30)
             query = (
-                f"UPDATE stakes WHERE user={user} "
-                + f"AND (type=interest) AND status=pending AND number=1"
-                + f"SET (status=paid, block={block}, processed={JUNE30})"
+                "UPDATE stakes WHERE user=? "
+                + "AND (type=interest) AND status=pending AND number=1"
+                + "SET (status=paid, block=?, processed=?)"
             )
-            cur.execute(query)
+            values = (
+                user,
+                block,
+                JUNE30,
+            )
+            cur.execute(query, values)
             block = convert_munix_to_block(JULY31)
             query = (
-                f"UPDATE stakes WHERE user={user} "
-                + f"AND (type=interest) AND status=pending AND number=2"
-                + f"SET (status=paid, block={block}, processed={JULY31})"
+                "UPDATE stakes WHERE user=? "
+                + "AND (type=interest) AND status=pending AND number=2"
+                + "SET (status=paid, block=?, processed=?)"
             )
-            cur.execute(query)
-    # commit and close the database
+            values = (user, block, JULY31)
+            cur.execute(query, values)
+    # commit edit to database
     con.commit()
-    con.close()
+
 
 
 def initialize_database_with_existing_contracts():
     """
     primary event loop to initialize the database with existing contracts
     """
+    con = sql(DB)
     # convert text block to a matrix
     stake_matrix = convert_stakes_to_matrix(STAKES)
     # add block number to each row in matrix
     stake_matrix = add_block_num(stake_matrix)
     # add stakes to database
-    for stake in matrix:
+    for stake in stake_matrix:
         client = stake[0]
         nonce = stake[1]
         amount = stake[2]
         months = stake[3]
-        new_stake(nonce, block, client, amount, months)
+        block = convert_munix_to_block(nonce)
+        stake_start(nonce, block, client, amount, months, con)
     # mark payouts already made as paid
-    mark_prepaid_stakes(stake_matrix)
-
+    mark_prepaid_stakes(stake_matrix, con)
+    con.close()
 
 if __name__ == "__main__":
 
