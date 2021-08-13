@@ -190,8 +190,13 @@ def update_receipt_database(nonce, msg, con):
     """
 
     cur = con.cursor()
-    query = f"INSERT INTO receipts (nonce, now, msg) VALUES ({nonce},{munix()},{msg})"
-    cur.execute(query)
+    query = "INSERT INTO receipts (nonce, now, msg) VALUES (?,?,?)"
+    values = (
+        nonce,
+        munix(),
+        msg,
+    )
+    cur.execute(query, values)
     # commit the database edit
     con.commit()
 
@@ -230,46 +235,88 @@ def stake_start(nonce, block, client, amount, months, con, keys=None):
     # open the database
     cur = con.cursor()
     # insert the contract into the stakes database
+    contract = f"contract_{months}"
     query = (
         "INSERT INTO stakes "
         + "(client, token, amount, type, start, due, processed, status, block, number) "
-        + "VALUES "
-        + f"({client}, BTS, 1, contract_{months}, {nonce}, {nonce}, {nonce}, paid, "
-        + f"{block}, 0) "
+        + "VALUES (?,?,?,?,?,?,?,?,?,?)"
     )
-    cur.execute(query)
+    values = (
+        client,
+        "BTS",
+        1,
+        contract,
+        nonce,
+        nonce,
+        nonce,
+        "paid",
+        block,
+        0,
+    )
+    cur.execute(query, values)
     # insert the principal into the stakes database
     due = nonce + months * MUNIX_MONTH
     query = (
         "INSERT INTO stakes "
         + "(client, token, amount, type, start, due, processed, status, block, number) "
-        + "VALUES "
-        + f"({client}, BTS, {amount}, principal, {nonce}, {due}, 0, pending), "
-        + f"{block}, 0) "
+        + "VALUES (?,?,?,?,?,?,?,?,?,?)"
     )
-    cur.execute(query)
+    values = (
+        client,
+        "BTS",
+        amount,
+        "principal",
+        nonce,
+        due,
+        0,
+        "pending",
+        block,
+        0,
+    )
+    cur.execute(query, values)
     # insert the early exit penalty into the stakes database
     penalty = -1 * amount * PENALTY
     query = (
         "INSERT INTO stakes "
         + "(client, token, amount, type, start, due, processed, status, block, number) "
-        + "VALUES "
-        + f"({client}, BTS, {penalty}, penalty, {nonce}, {due}, 0, pending, "
-        + f"{block}, 0) "
+        + "VALUES (?,?,?,?,?,?,?,?,?,?)"
     )
-    cur.execute(query)
+    values = (
+        client,
+        "BTS",
+        penalty,
+        "penalty",
+        nonce,
+        due,
+        0,
+        "pending",
+        block,
+        0,
+    )
+    cur.execute(query, values)
     # insert the interest payments into the stakes database
     interest = amount * INTEREST
     for month in range(1, months + 1):
         due = nonce + month * MUNIX_MONTH
         query = (
             "INSERT INTO stakes "
-            + "(client, token, amount, type, start, due, processed, status, block, number) "
-            + "VALUES "
-            + f"({client}, BTS, {interest}, interest, {nonce}, {due}, 0, pending, "
-            + f"{block}, {month}) "
+            + "(client, token, amount, type, start, due, processed, status, block, "
+            + "number) "
+            + "VALUES (?,?,?,?,?,?,?,?,?,?)"
         )
-        cur.execute(query)
+        values = (
+            client,
+            "BTS",
+            interest,
+            "interest",
+            nonce,
+            due,
+            0,
+            "pending",
+            block,
+            month,
+        )
+        cur.execute(query, values)
     # commit the database edit
     con.commit()
 
@@ -289,10 +336,10 @@ def stake_stop(nonce, block, client, keys, con):
     # open db connection and query principal and and penalties due to client
     cur = con.cursor()
     query = (
-        f"SELECT amount FROM stakes WHERE client={client} "
-        + "AND (type=principal OR type=penalty)"
+        "SELECT amount FROM stakes WHERE client=? AND (type=principal OR type=penalty)"
     )
-    cur.execute(query)
+    values = (client,)
+    cur.execute(query, values)
     amount = sum(cur.fetchall())
     # send premature payment to client
     memo = f"closing stakeBTS {nonce} prematurely at client request"
@@ -301,23 +348,38 @@ def stake_stop(nonce, block, client, keys, con):
     # update stakes database for principal, penalties, and interest payments
     # with new status, time processed, and block number
     query = (
-        f"UPDATE stakes WHERE "
-        + f"client={client} AND status=pending AND type=principal "
-        + f"SET status=premature, processed={nonce}, block={block}"
+        "UPDATE stakes WHERE "
+        + "client=? AND status=pending AND type=principal "
+        + "SET status=premature, processed=?, block=?"
     )
-    cur.execute(query)
+    values = (
+        client,
+        nonce,
+        block,
+    )
+    cur.execute(query, values)
     query = (
-        f"UPDATE stakes WHERE "
-        + f"client={client} AND status=pending AND type=penalty"
-        + f"SET status=paid, processed={nonce}, block={block}"
+        "UPDATE stakes WHERE "
+        + "client=? AND status=pending AND type=penalty"
+        + "SET status=paid, processed=?, block=?"
     )
-    cur.execute(query)
+    values = (
+        client,
+        nonce,
+        block,
+    )
+    cur.execute(query, values)
     query = (
-        f"UPDATE stakes WHERE "
-        + f"client={client} AND status=pending AND type=interest "
-        + f"SET status=aborted, processed={nonce}, block={block}"
+        "UPDATE stakes WHERE "
+        + "client=? AND status=pending AND type=interest "
+        + "SET status=aborted, processed=?, block=?"
     )
-    cur.execute(query)
+    values = (
+        client,
+        nonce,
+        block,
+    )
+    cur.execute(query, values)
     # commit the database edit
     con.commit()
 
@@ -557,8 +619,9 @@ def listener(keys, con):
         """
 
         cur = con.cursor()
-        query = f"UPDATE block SET block={block_num}"
-        cur.execute(query)
+        query = "UPDATE block SET block=?"
+        values = (block_num,)
+        cur.execute(query, values)
         # commit the database edit
         con.commit()
 
@@ -596,12 +659,19 @@ def make_payouts(keys, con):
 
         cur = con.cursor()
         query = (
-            f"UPDATE stakes WHERE "
-            + f"user={client} AND nonce={nonce} AND number={number} "
+            "UPDATE stakes WHERE "
+            + "user=? AND nonce=? AND number=? "
             + "AND status=processing AND (type=interest OR type=principal)"
-            + f"SET (status=paid, block={get_block_num_current()}, processed={munix()})"
+            + "SET (status=paid, block=?, processed=?)"
         )
-        cur.execute(query)
+        values = (
+            client,
+            nonce,
+            number,
+            get_block_num_current(),
+            munix(),
+        )
+        cur.execute(query, values)
         # commit the database edit
         con.commit()
 
@@ -694,25 +764,36 @@ def make_payouts(keys, con):
     # gather list of payments due
     query = (
         "SELECT (amount, client, start, number) FROM stakes "
-        + f"WHERE nonce<{now} "
+        + "WHERE nonce<? "
         + "AND (type=principal OR type=interest) AND status=pending"
     )
-    cur.execute(query)
+    values = (now,)
+    cur.execute(query, values)
     payments_due = cur.fetchall()
     # update principal and interest due status to paid
     query = (
-        f"UPDATE stakes WHERE nonce<{now} "
+        "UPDATE stakes WHERE nonce<? "
         + "AND (type=principal OR type=interest) AND status=pending"
-        + f"SET (status=processing, block={block}, processed={now})"
+        + "SET (status=processing, block=?, processed=?)"
     )
-    cur.execute(query)
+    values = (
+        now,
+        block,
+        now,
+    )
+    cur.execute(query, values)
     # update penalties due to status aborted
     query = (
-        f"UPDATE stakes WHERE nonce<{now} "
+        "UPDATE stakes WHERE nonce<? "
         + "AND type=penalty AND status=pending"
-        + f"SET (status=aborted, block={block}, processed={now})"
+        + "SET (status=aborted, block=?, processed=?)"
     )
-    cur.execute(query)
+    values = (
+        now,
+        block,
+        now,
+    )
+    cur.execute(query, values)
     # commit the database edit
     con.commit()
     # make payments
