@@ -12,6 +12,7 @@ CREATE TABLE stakes (
     processed INTEGER
     status TEXT
     block INTEGER
+    number INTEGER
 );
 
 CREATE TABLE receipts (
