@@ -5,6 +5,10 @@
 
 # v2.0
 
+`DESCRIPTION`
+
+Recurring interest and principal payment automation for bitsharesmanagement.group to stakeBTS clients
+
 `INTALLATION`
 
 **Install SQLite3:**
