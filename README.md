@@ -253,10 +253,12 @@ manner as all other contracts thereafter.
 
 This software is sponsored and managed by BitShares Management Group Limited
 
+www.bitshares.org
+
 `DEVELOPERS`
 
 v1.0 initial prototype
-- iamredbar
+- iamredbar: iamredbar@protonmail.com
 
 v2.0 refactor, refinement, added features
 - litepresence: finitestate@tutamail.com
