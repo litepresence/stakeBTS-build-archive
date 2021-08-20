@@ -1,42 +1,59 @@
 
 ## StakeBTS Python Bot
 
-`VERSION`
+`APP VERSION`
 
 # v2.0
 
+`PYTHON VERSION`
+
+# 3.8+
+
+`PYTHON REQUIREMENTS`
+
+# bitshares
+# uptick
+
 `DESCRIPTION`
 
-Recurring interest and principal payment automation for bitsharesmanagement.group to stakeBTS clients
+Recurring interest and principal payment automation
+for bitsharesmanagement.group to stakeBTS clients
 
 `INTALLATION`
 
 **Install SQLite3:**
-```shell
-apt install -y sqlite3
+```
+sudo apt install -y sqlite3
 ```
 
-**Create investment.db from db_setup.txt file:**
-
-```sqlite3 investment.db```
+**Create stake_bitshares.db from db_setup.txt file:**
+```
+sqlite3 stake_bitshares.db
+```
 
 (Copy/paste content of db_setup.txt)
-
-```.quit```
+```
+.quit
+```
 
 **Create and activate environment:**
-```shell
+```
+sudo apt-get install python3-venv
 python3 -m venv env
 source env/bin/activate
 ```
 
 **Install requirements into environment:**
-```shell
+```
 pip3 install -r requirements.txt
 ```
 
-**Run app**
+**import old client data**
+```
+python3.8 import_data.py
+```
 
+**Run app**
 ```
 python3.8 stake_bitshares.py
 ```
@@ -61,6 +78,7 @@ CHANGELIST v2.0
 - all current payouts due are grouped into a thread
 - each individual payout is now a time limited subprocess
 - apscheduler has been replaced by marking databased payments paid as they are paid
+- approved admin must be lifetime members of BitShares to run the bot
 
 
 `NOTES`
@@ -166,32 +184,6 @@ CHANGELIST v2.0
 
     login then begin while loop listening for client requests and making timely payouts
 
-
-`WORKFLOW`
-
-    login
-
-    while True:
-
-        check node for new stakes or requests to stop stakes to appear on chain
-
-            if any new stakes
-                send 1 BTS receipt via pybitshares
-                add contract_{months} to database, mark paid 1
-                move all potential payouts/penalties due to database, mark pending
-
-            if any stops
-                send premature payout via bittrex
-                mark paid/aborted/premature in database as applicable
-
-        make periodic payments to clients as they become due by unix stamp
-
-            if any due
-                send payment via bittrex
-                mark payments due paid in database as applicable
-                mark penalties due aborted
-
-
 `JSON FORMAT`
 {"type":"<LENGTH_OF_STAKE>"}
 
@@ -249,11 +241,120 @@ import_data.py moves those existing contracts to the database in the same
 manner as all other contracts thereafter.
 
 
+`
+DISCUSSION
+`
+
+The stakeBTS is 2 listeners with withdrawal priviledges
+communicating via sql database.
+
+1) bitshares block operation listener:
+
+    listens for new client stakes
+        sends stake confirmation (withdrawal)
+        inputs potential stake payouts to database
+    listens for cancelled client stakes
+        ends stakes prematurely paying principal less penalty (withdrawal)
+        updates database accordingly and aborts further interest payments
+
+
+2) payment due sql database listener:
+
+    listens for pending items past due
+    pays interest and principal on due time (withdrawal)
+    if penalty becomes due its aborted
+
+
+a client approaches bmg w/ a new stake the bot creates database rows
+for every potential outcome of that stake;
+there will always be 3 + number of months rows created.
+contract_n, principal, penalty, interest, interest, interest, etc.
+and interest payments will be numbered,
+contract will always be for amount 1, and penalty will always be negative.
+every payment, regardless of type, will have a due date upon creation...
+contract is always due on day of creation.
+principal and penalty are always due at close of contract.
+interest is due in ascending 30 day periods.
+for example a 100000 3 month contract has 6 lines
+
+
+1) type=contract_3 amount=1 status=paid number=0
+2) type=principal amount=100000 status=pending number=0
+3) type=penalty amount=-15000 status=pending number=0
+4) type=interest amount=8000 status=pending number=1
+5) type=interest amount=8000 status=pending number=2
+6) type=interest amount=8000 status=pending number=3
+
+
+this is the stake rows of 3 month contract -
+there are also additional columns for timestamps, etc...
+but we'll skip them for now just to have discussion
+
+
+so whether a new user approaches... or we put old contracts into the database...
+if its a 3 month contract there are 6 db entries
+(6 month contract has +3 entries and
+12 month contract has +6 entries to account for additional interest payments)
+
+
+in the case of new user...
+as each pending item approaches its due date, it will be processed.
+The bot (aside from being a block ops listener)
+is also effectively a "database listener"
+looking for status=pending where time due < now.
+1) if interest becomes due its paid.
+2) if the penalty comes due it is aborted and final principal+interest is paid.
+3) if the user takes principal prior to due...
+then pending interest are aborted
+and the (negative) penalty is paid against the principal.
+
+
+in the case of an existing "old" contract...
+it is uploaded in the database the exact same way;
+but automated/simulated by script to run through the text document containing them...
+rather than via "block ops listener".
+
+additionally... the import old data script goes in and overwrites the "pending" status
+ on the 1st (or 1st and 2nd) interest payment to "paid"
+ so that it does not get processed again by the main script.
+it uses the number column in the database to update the correct payment
+and marks them processed on june 30 or july 31 of this year
+
+
+this happens once prior to the main script startup you'll have to run import_data.py
+to build the initial database of old contracts. It
+1) adds all line items for each old contract and
+2) marks those already manually processed as paid.
+
+then when you start running the main script full time...
+the 3rd final payout of an old contract (some cases 2nd and 3rd)
+will still be a pending item in the database to be processed.
+It will either pay it as it comes due...
+or if taken prematurely it will abort it
+and return principal less penalty as it would with any other stake.
+Once the main bot is running
+it won't know the difference between old contracts and new.
+it just sees "pending" vs "paid/aborted" line items
+
+`FEATURES`
+
+- automatically move funds from bittrex to hot wallet to cover payments due
+- does not allow non-ltm users to administrate
+
+`WARNING`
+
+This software is provided without warranty.
+Automating withdrawals is inherently exploit prone.
+Conduct an security review commensurate with your investment.
+
 `SPONSOR`
 
 This software is sponsored and managed by BitShares Management Group Limited
+- bitshares.org
 
-www.bitshares.org
+`LICENSE`
+
+
 
 `DEVELOPERS`
 
@@ -262,3 +363,4 @@ v1.0 initial prototype
 
 v2.0 refactor, refinement, added features
 - litepresence: finitestate@tutamail.com
+
