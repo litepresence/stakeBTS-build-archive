@@ -3,16 +3,16 @@
 
 `APP VERSION`
 
-# v2.0
+**v2.0**
 
 `PYTHON VERSION`
 
-# 3.8+
+**3.8+**
 
 `PYTHON REQUIREMENTS`
 
-# bitshares
-# uptick
+**bitshares**
+**uptick**
 
 `DESCRIPTION`
 
