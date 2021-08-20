@@ -336,6 +336,28 @@ Once the main bot is running
 it won't know the difference between old contracts and new.
 it just sees "pending" vs "paid/aborted" line items
 
+`UNIT TESTING CHECKLIST`
+
+- in config.py set `DEV = True`
+  - send 0.1 BTS to broker, ensure script hears it arrive to config.py `BROKER`
+  - via sql, change the due date on a single payment to yesterday, see that it gets paid
+  - in config.py test True, False, int() of `REPLAY`
+- in a seperate script:
+  - unit test `post_withdrawal_bittrex()` and `post_withdrawal_pybitshares()`
+  - test test `get_balance_bittrex()` and `get_balance_pybitshares()`
+- delete database, recreate database, run import_data.py, print database
+- with config.py set `DEV = False` and `1000` added to the list of `INVEST_AMOUNTS`
+  - test login functionality
+  - send an invalid amount
+  - send an invalid memo
+  - send a valid amount `1000` and memo to start a new stake
+  - send signal to stop a stake
+  - using a `MANAGER` account, test admin memos with and without `LTM`
+   - `bmg_to_bittrex`
+   - `bittrex_to_bmg`
+   - `loan_to_bmg`
+ - after unit testing check state of `receipts` and `stakes` database tables
+
 `FEATURES`
 
 - automatically move funds from bittrex to hot wallet to cover payments due
