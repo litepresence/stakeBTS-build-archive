@@ -767,7 +767,7 @@ def login():
     return keys
 
 
-def listener_bitshares(keys, con):
+def listener_bitshares(keys):
     """
     get the last block number checked from the database
     and the latest block number from the node
@@ -775,6 +775,7 @@ def listener_bitshares(keys, con):
     then update the last block checked in the database
     :param dict(keys): bittrex api keys and pybitshares wallet password
     """
+    con = sql(DB)
     while True:
         block_last = get_block_num_database(con)
         block_new = get_block_num_current()
@@ -787,10 +788,10 @@ def listener_bitshares(keys, con):
             Block.clear_cache()
             check_block(block_num, block, keys, con)
             set_block_num_database(block_num, con)
-        time.sleep(20)
+        time.sleep(30)
 
 
-def listener_sql(keys, con):
+def listener_sql(keys):
     """
     make all interest and principal payments due
     mark interest and principal paid in database
@@ -799,7 +800,7 @@ def listener_sql(keys, con):
     send payments via pybitshares wallet
     :param dict(keys): pybitshares wallet password
     """
-
+    con = sql(DB)
     while True:
         # get millesecond timestamp and current block number
         now = munix()
@@ -891,12 +892,12 @@ def main():
     welcome(keys, con)
     # block operations listener_bitshares for incoming client requests
     # this thread will contain a continuous while loop
-    listener_thread = Thread(target=listener_bitshares, args=(keys, con))
+    listener_thread = Thread(target=listener_bitshares, args=(keys))
     listener_thread.start()
     # sql db payout listener_bitshares for payments now due
     # this thread will contain a continuous while loop
     # listener_sql() will launch child payment threads via spawn_payments()
-    payout_thread = Thread(target=listener_sql, args=(keys, con))
+    payout_thread = Thread(target=listener_sql, args=(keys))
     payout_thread.start()
 
 
