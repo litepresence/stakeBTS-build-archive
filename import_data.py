@@ -3,7 +3,6 @@ BitShares.org StakeMachine
 Import Old Contracts to Database Upon Initialization
 BitShares Management Group Co. Ltd.
 """
-
 # STANDARD IMPORTS
 import datetime
 from sqlite3 import connect as sql
@@ -57,9 +56,7 @@ def convert_stakes_to_matrix(stakes):
 def convert_munix_to_block(munix):
     """
     approximate a blocktime given a millesecond unix timestamp, eg:
-
     NOTE: bitshares block is 3 seconds
-
     blocktime           btime unix     irr block
     2021-08-07T11:45:39 = 1628336739 = 60832769
     60832769 * 3 = 182498307 seconds
@@ -100,9 +97,8 @@ def mark_prepaid_stakes(stake_matrix, con):
             block = convert_munix_to_block(JULY31)
             query = (
                 "UPDATE stakes "
-                + "SET status='paid', block=?, processed=? "
+                + "SET status='paid', block_processed=?, processed=? "
                 + "WHERE client=? AND type='interest' AND status='pending' AND number='1'"
-
             )
             values = (block, JULY31, client)
             print(query)
@@ -114,7 +110,7 @@ def mark_prepaid_stakes(stake_matrix, con):
             block = convert_munix_to_block(JUNE30)
             query = (
                 "UPDATE stakes "
-                + "SET status='paid', block=?, processed=? "
+                + "SET status='paid', block_processed=?, processed=? "
                 + "WHERE client=? AND type='interest' AND status='pending' AND number='1'"
             )
             values = (block, JUNE30, client)
@@ -125,7 +121,7 @@ def mark_prepaid_stakes(stake_matrix, con):
             block = convert_munix_to_block(JULY31)
             query = (
                 "UPDATE stakes "
-                + "SET status='paid', block=?, processed=? "
+                + "SET status='paid', block_processed=?, processed=? "
                 + "WHERE client=? AND type='interest' AND status='pending' AND number='2'"
             )
             print(query)
@@ -171,7 +167,4 @@ def initialize_database_with_existing_contracts():
 
 
 if __name__ == "__main__":
-
     initialize_database_with_existing_contracts()
-
-
