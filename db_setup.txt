@@ -1,7 +1,6 @@
 CREATE TABLE block (
     block INTEGER
 );
-
 CREATE TABLE stakes (
     client TEXT,
     token TEXT,
@@ -11,19 +10,16 @@ CREATE TABLE stakes (
     due INTEGER,
     processed INTEGER,
     status TEXT,
-    block INTEGER,
+    block_start INTEGER,
+    block_processed INTEGER,
     number INTEGER,
-
     UNIQUE (
-    client, type, start, number
+    client, type, number, block_start
     ) ON CONFLICT IGNORE
-
 );
-
 CREATE TABLE receipts (
     nonce INTEGER,
     now INTEGER,
     msg TEXT
 );
-
 INSERT INTO block (block) VALUES (61000000);
