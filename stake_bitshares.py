@@ -26,9 +26,22 @@ from bitshares.memo import Memo
 
 # STAKE BTS IMPORTS
 from bittrex_api import Bittrex
-from config import (BITTREX_1, BITTREX_2, BITTREX_3, BITTREX_ACCT, BROKER, DB,
-                    DEV, EMAIL, INTEREST, INVEST_AMOUNTS, MANAGERS, NODE,
-                    PENALTY, REPLAY)
+from config import (
+    BITTREX_1,
+    BITTREX_2,
+    BITTREX_3,
+    BITTREX_ACCT,
+    BROKER,
+    DB,
+    DEV,
+    EMAIL,
+    INTEREST,
+    INVEST_AMOUNTS,
+    MANAGERS,
+    NODE,
+    PENALTY,
+    REPLAY,
+)
 
 # GLOBAL CONSTANTS
 MUNIX_MONTH = 86400 * 30 * 1000
@@ -275,6 +288,7 @@ def stake_start(params, con, keys=None):
         # send confirmation receipt to client with memo using pybitshares
         memo = f"{months} stake contract for {amount} BTS received timestamp {nonce}"
         memo += post_withdrawal_pybitshares(1, client, memo, keys)
+        memo += json_dumps(params)
         update_receipt_database(nonce, memo, con)
     # open the database
     cur = con.cursor()
@@ -433,7 +447,6 @@ def stake_paid(params, con):
     :param int(number): the counting number of this interest payment
     :return None:
     """
-
     client, nonce, number = map(params.get, ("client", "nonce", "number"))
     cur = con.cursor()
     query = (
@@ -545,7 +558,7 @@ def serve_invalid(params, keys):
     :param dict(keys):
     """
     # localize parameters
-    memo, amount, client, nonce, block_num, keys = map(
+    memo, amount, client, nonce, block_num = map(
         params.get, ("memo", "amount", "client", "nonce", "block_num")
     )
     request_type = {
@@ -563,7 +576,7 @@ def serve_invalid(params, keys):
     msg = str("invalid request, 50 BTS fee charged", json_dumps(request_type))
     amount -= 50
     if amount > 10:
-        msg += post_withdrawal_pybitshares(int(amount), client, keys, msg)
+        msg += post_withdrawal_pybitshares(int(amount), client, msg, keys)
     return msg
 
 
@@ -709,6 +722,7 @@ def payment_child(params, keys):
     # assuming we have enough, just pay the client his due
     if covered:
         msg = post_withdrawal_pybitshares(amount, client, memo, keys)
+        msg += json_dumps(params)
         update_receipt_database(nonce, msg, con)
         stake_paid(params, con)
     # something went wrong, send the client an IOU with support details
@@ -719,6 +733,7 @@ def payment_child(params, keys):
             + f"BTSstake nonce {nonce} type {params['type']} {number}"
         )
         msg = memo + post_withdrawal_pybitshares(1, client, memo, keys)
+        msg += json_dumps(params)
         update_receipt_database(nonce, msg, con)
 
 
@@ -749,8 +764,9 @@ def payment_cover(params, con, keys):
                 bittrex_available = bittrex_balance[api]
                 if bittrex_available > 510:
                     qty = min(deficit, bittrex_available - 10)
-                    msg = "cover payment" + json_dumps(params)
+                    msg = "cover payment"
                     msg += post_withdrawal_bittrex(qty, BROKER, keys, api)
+                    msg += json_dumps(params)
                     update_receipt_database(nonce, msg, con)
                     deficit -= qty
                     if deficit <= 0:
@@ -965,7 +981,6 @@ def main():
     """
     login then begin while loop listening for client requests and making timely payouts
     """
-
     keys = login()
     welcome(keys)
     # branch into two run forever threads
