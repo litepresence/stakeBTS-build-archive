@@ -45,17 +45,17 @@ from config import (
 
 # GLOBAL CONSTANTS
 MUNIX_MONTH = 86400 * 30 * 1000
-CLIENT_MEMOS = {
-    "stop"  # client stops all outstanding contracts
-    "three_months"  # client creates 3 month contract
-    "six_months"  # client creates 6 month contract
-    "twelve_months"  # client creates 12 month contract
-}
-ADMIN_MEMOS = {
-    "bittrex_to_bmg"  # manager moves funds from bittrex to bitsharemanagment.group
-    "bmg_to_bittrex"  # manager moves funds from bitsharemanagment.group to bittrex
-    "loan_to_bmg"  # manager makes personal loan to bitsharesmanagement.group
-}
+CLIENT_MEMOS = [
+    "stop",  # client stops all outstanding contracts
+    "three_months",  # client creates 3 month contract
+    "six_months",  # client creates 6 month contract
+    "twelve_months",  # client creates 12 month contract
+]
+ADMIN_MEMOS = [
+    "bittrex_to_bmg",  # manager moves funds from bittrex to bitsharemanagment.group
+    "bmg_to_bittrex",  # manager moves funds from bitsharemanagment.group to bittrex
+    "loan_to_bmg",  # manager makes personal loan to bitsharesmanagement.group
+]
 MONTHS = {
     "three_months": 3,
     "six_months": 6,
