@@ -26,22 +26,9 @@ from bitshares.memo import Memo
 
 # STAKE BTS IMPORTS
 from bittrex_api import Bittrex
-from config import (
-    BITTREX_1,
-    BITTREX_2,
-    BITTREX_3,
-    BROKER,
-    DB,
-    DEV,
-    EMAIL,
-    INTEREST,
-    INVEST_AMOUNTS,
-    MANAGERS,
-    NODE,
-    PENALTY,
-    REPLAY,
-    BITTREX_ACCT,
-)
+from config import (BITTREX_1, BITTREX_2, BITTREX_3, BITTREX_ACCT, BROKER, DB,
+                    DEV, EMAIL, INTEREST, INVEST_AMOUNTS, MANAGERS, NODE,
+                    PENALTY, REPLAY)
 
 # GLOBAL CONSTANTS
 MUNIX_MONTH = 86400 * 30 * 1000
@@ -156,9 +143,9 @@ def post_withdrawal_pybitshares(amount, client, memo, keys):
         try:
             bitshares, _ = pybitshares_reconnect()
             bitshares.wallet.unlock(keys["password"])
-            msg += str(bitshares.transfer(
-                client, amount, "BTS", memo, account=keys["broker"]
-            ))
+            msg += str(
+                bitshares.transfer(client, amount, "BTS", memo, account=keys["broker"])
+            )
             bitshares.wallet.lock()
             bitshares.clear_cache()
         except Exception as error:
@@ -303,9 +290,9 @@ def stake_start(params, con, keys=None):
         "BTS",
         1,
         f"contract_{months}",
-        nonce, # start now
-        nonce, # due now
-        nonce, # processed now
+        nonce,  # start now
+        nonce,  # due now
+        nonce,  # processed now
         "paid",
         block,
         NINES,
@@ -325,7 +312,7 @@ def stake_start(params, con, keys=None):
         amount,
         "principal",
         nonce,
-        nonce + months * MUNIX_MONTH, # due at end of term
+        nonce + months * MUNIX_MONTH,  # due at end of term
         0,
         "pending",
         block,
@@ -346,10 +333,10 @@ def stake_start(params, con, keys=None):
     values = (
         client,
         "BTS",
-        int(-1 * amount * PENALTY), # entered as negative value
+        int(-1 * amount * PENALTY),  # entered as negative value
         "penalty",
         nonce,
-        nonce + months * MUNIX_MONTH, # due at end of term
+        nonce + months * MUNIX_MONTH,  # due at end of term
         0,
         "pending",
         block,
@@ -371,7 +358,7 @@ def stake_start(params, con, keys=None):
             int(amount * INTEREST),
             "interest",
             nonce,
-            nonce + month * MUNIX_MONTH, # due monthly
+            nonce + month * MUNIX_MONTH,  # due monthly
             0,
             "pending",
             block,
@@ -409,7 +396,7 @@ def stake_stop(params, con, keys):
     params["amount"] = amount
     params["number"] = 0
     params["type"] = "stop"
-    thread = Thread(target=payment_thread, args=(deepcopy(params), keys,),)
+    thread = Thread(target=payment_child, args=(deepcopy(params), keys,),)
     thread.start()
     # update stakes database for principal, penalties, and interest payments
     # with new status, time processed, and block number
@@ -438,7 +425,7 @@ def stake_stop(params, con, keys):
     con.commit()
 
 
-def mark_as_paid(params, con):
+def stake_paid(params, con):
     """
     update the stakes database for this payment from "processing" to "paid"
     :param str(client): bitshares username of staking client
@@ -531,8 +518,12 @@ def serve_admin(params, keys):
             assert amount > 1000
             decode_api = {1: BITTREX_1, 2: BITTREX_2, 3: BITTREX_3}
             bittrex_memo = decode_api[api]
-            msg = memo["type"] + bittrex_memo + post_withdrawal_pybitshares(
-                int(amount), BITTREX_ACCT, keys, bittrex_memo
+            msg = (
+                memo["type"]
+                + bittrex_memo
+                + post_withdrawal_pybitshares(
+                    int(amount), BITTREX_ACCT, keys, bittrex_memo
+                )
             )
         except Exception:
             pass
@@ -652,7 +643,7 @@ def check_block(block_num, block, con, keys):
 
 
 # PAYMENTS
-def spawn_payments(payments_due, keys):
+def payment_parent(payments_due, keys):
     """
     spawn payment threads
     :param matrix(payments_due): list of payments due;
@@ -667,16 +658,16 @@ def spawn_payments(payments_due, keys):
             "client": payment[1],
             "nonce": payment[2],
             "number": payment[3],
-            "type": payment[4]
+            "type": payment[4],
         }
-        # each individual outbound payment_thread()
+        # each individual outbound payment_child()
         # is a child of listener_sql(),
         # we'll use deepcopy so that the thread's locals are static to the payment
-        threads[payment] = Thread(target=payment_thread, args=(deepcopy(params), keys,),)
+        threads[payment] = Thread(target=payment_child, args=(deepcopy(params), keys,),)
         threads[payment].start()
 
 
-def payment_thread(params, keys):
+def payment_child(params, keys):
     """
     attempt to make simple payout
     if success:
@@ -705,8 +696,8 @@ def payment_thread(params, keys):
     print(it("green", str(("make payout process", amount, client, nonce, number))))
     memo = (
         f"Payment for stakeBTS nonce {nonce} type {params['type']} {number}, "
-        +"we appreciate your business!"
-        )
+        + "we appreciate your business!"
+    )
     # calculate need vs check how much funds we have on hand in the brokerage account
     params.update(
         {"need": amount + 10, "pybitshares_balance": get_balance_pybitshares()}
@@ -714,12 +705,12 @@ def payment_thread(params, keys):
     # if we don't have enough we'll have to move some BTS from bittrex to broker
     covered = True
     if params["pybitshares_balance"] < params["need"]:
-        covered = cover_payment(params, con, keys)
+        covered = payment_cover(params, con, keys)
     # assuming we have enough, just pay the client his due
     if covered:
         msg = post_withdrawal_pybitshares(amount, client, memo, keys)
         update_receipt_database(nonce, msg, con)
-        mark_as_paid(params, con)
+        stake_paid(params, con)
     # something went wrong, send the client an IOU with support details
     else:
         memo = (
@@ -731,7 +722,7 @@ def payment_thread(params, keys):
         update_receipt_database(nonce, msg, con)
 
 
-def cover_payment(params, con, keys):
+def payment_cover(params, con, keys):
     """
     when there are not enough funds in pybitshares wallet
     move some funds from bittrex, check all 3 corporate api accounts
@@ -864,7 +855,7 @@ def listener_sql(keys):
         cur.execute(query, values)
         # commit the database edit then make the payments due
         con.commit()
-        spawn_payments(payments_due, keys)
+        payment_parent(payments_due, keys)
         time.sleep(30)
 
 
@@ -984,7 +975,7 @@ def main():
     thread_1.start()
     # sql db payout listener_sql for payments now due
     # this thread will contain a continuous while loop
-    # listener_sql() will launch child payment threads via spawn_payments()
+    # listener_sql() will launch child payment threads via payment_parent()
     thread_2 = Thread(target=listener_sql, args=(keys))
     thread_2.start()
 
