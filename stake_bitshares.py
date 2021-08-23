@@ -123,6 +123,7 @@ def post_withdrawal_bittrex(amount, client, api, keys):
     :param int(api): 1, 2, or 3; corporate account to send from
     :return str(msg): withdrawal response from bittrex
     """
+    amount = int(amount)
     msg = f"POST WITHDRAWAL BITTREX {amount} {client} {api}"
     print(it("yellow", msg))
     if not DEV:
@@ -150,6 +151,7 @@ def post_withdrawal_pybitshares(amount, client, memo, keys):
     :param str(memo): message to client
     :return str(msg): withdrawal response from pybitshares wallet
     """
+    amount = int(amount)
     msg = f"POST WITHDRAWAL PYBITSHARES {amount} {client} {memo}"
     print(it("yellow", msg))
     if not DEV:
@@ -573,7 +575,12 @@ def serve_invalid(params, keys):
         "nonce": nonce,  # start time of this ticket
         "block": block_num,  # block number client sent funds
     }
-    msg = str("invalid request, 50 BTS fee charged", json_dumps(request_type))
+
+    msg = "invalid request "
+    if amount > 50:
+        msg += "50 BTS fee charged "
+    msg += json_dumps(request_type)
+    print(msg)
     amount -= 50
     if amount > 10:
         msg += post_withdrawal_pybitshares(int(amount), client, msg, keys)
@@ -613,32 +620,32 @@ def check_block(block_num, block, con, keys):
             pass
         return msg
 
-    for trxs in block["transactions"]:
-        for trx in trxs["operations"]:
+    for trx in block["transactions"]:
+        for ops in trx["operations"]:
             # if it is a BTS transfer to the broker managed account
             if (
-                trx[0] == 0  # withdrawal
-                and Account(trx[1]["to"]).name == keys["broker"]  # transfer to me
-                and str(trx[1]["amount"]["asset_id"]) == "1.3.0"  # of BTS core token
+                ops[0] == 0  # withdrawal
+                and Account(ops[1]["to"]).name == keys["broker"]  # transfer to me
+                and str(ops[1]["amount"]["asset_id"]) == "1.3.0"  # of BTS core token
             ):
                 # provide timestamp, extract amount and client, dedode the memo
                 msg = ""
-                memo = get_json_memo(keys, trx)
+                memo = get_json_memo(keys, ops)
                 nonce = munix()
-                client = Account(trx[1]["from"]).name
+                client = Account(ops[1]["from"]).name
                 amount = int(
-                    trx[1]["amount"]["amount"] / 10 ** Asset("1.3.0").precision
+                    ops[1]["amount"]["amount"] / 10 ** Asset("1.3.0").precision
                 )
                 params = {
                     "client": client,
                     "amount": amount,
                     "memo": memo,
                     "block_num": block_num,
-                    "block": block,
+                    "ops": ops,
                     "nonce": nonce,
                 }
-                if DEV:
-                    print(it("green", "post withdrawal"), amount, client, memo)
+                print(it("green", "incoming transaction to broker"))
+                print(it("green", json_dumps(params)))
                 # handle requests to start and stop stakes
                 if memo in CLIENT_MEMOS and amount in INVEST_AMOUNTS:
                     msg = serve_client(params, con, keys)
@@ -964,7 +971,7 @@ def login():
         keys = {
             "broker": BROKER,
             "password": getpass(
-                f"\nInput Pybitshares Password for {BROKER} and " + "press ENTER:\n"
+                f"\nInput Pybitshares Password for {BROKER} and press ENTER:\n"
             ),
             "api_1_key": getpass("\nInput Bittrex API 1 Key and press ENTER:\n"),
             "api_1_secret": getpass("\nInput Bittrex API 1 Secret and press ENTER:\n"),
@@ -986,12 +993,12 @@ def main():
     # branch into two run forever threads
     # block operations listener_bitshares for incoming client requests
     # this thread will contain a continuous while loop
-    thread_1 = Thread(target=listener_bitshares, args=(keys))
+    thread_1 = Thread(target=listener_bitshares, args=(keys,))
     thread_1.start()
     # sql db payout listener_sql for payments now due
     # this thread will contain a continuous while loop
     # listener_sql() will launch child payment threads via payment_parent()
-    thread_2 = Thread(target=listener_sql, args=(keys))
+    thread_2 = Thread(target=listener_sql, args=(keys,))
     thread_2.start()
 
 
