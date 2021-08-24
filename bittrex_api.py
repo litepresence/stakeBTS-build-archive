@@ -150,7 +150,6 @@ def unit_test():
     }
     ret = bittrex_api.post_withdrawal(**params)
     print(ret)
-    # need to get thailand VPN
 
 
 if __name__ == "__main__":
