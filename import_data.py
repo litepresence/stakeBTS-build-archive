@@ -145,12 +145,14 @@ def initialize_database_with_existing_contracts():
     stake_matrix = add_block_num(stake_matrix)
     # add stakes to database
     for stake in stake_matrix:
-        client = str(stake[0])
-        nonce = int(stake[1])
-        amount = int(stake[2])
-        months = int(stake[3])
-        block = int(convert_munix_to_block(nonce))
-        stake_start(nonce, block, client, amount, months, con)
+        params = {
+            "client": str(stake[0]),
+            "nonce": int(stake[1]),
+            "amount": int(stake[2]),
+            "months": int(stake[3]),
+            "block": int(convert_munix_to_block(int(stake[1]))),
+        }
+        stake_start(params, con)
     # mark payouts already made as paid
     mark_prepaid_stakes(stake_matrix, con)
     # display results and close db connection
