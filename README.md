@@ -1,5 +1,5 @@
 
-## StakeBTS Python Bot
+# StakeBTS Python Bot
 
 `APP VERSION`
 **v2.0**
@@ -300,18 +300,18 @@ it just sees "pending" vs "paid/aborted" line items
 
 `UNIT TESTING CHECKLIST`
 
-# 1) BALANCES AND WITHDRAWALS
+### 1) BALANCES AND WITHDRAWALS
 - in a seperate script import withdrawal and balances definitions:
 - unit test `post_withdrawal_bittrex()` and `post_withdrawal_pybitshares()`
 - unit test `get_balance_bittrex()` and `get_balance_pybitshares()`
 
-# 2) BLOCK OPERATIONS LISTENER
+### 2) BLOCK OPERATIONS LISTENER
 - reset database
 - in config.py set `DEV = True`
 - send 0.1 BTS to broker, ensure script hears it arrive to the `BROKER` account.
 - check state of `receipts` and `stakes` database tables
 
-# 3) DATABASE LISTENER
+### 3) DATABASE LISTENER
 - in config.py set `DEV = True`
 - reset database
 - load old contracts:
@@ -324,7 +324,7 @@ it just sees "pending" vs "paid/aborted" line items
 - - `UPDATE stakes SET due=0 WHERE client='user1234' AND number=6;`
 - check state of `receipts` and `stakes` database tables
 
-# 4) REPLAY BLOCKS
+### 4) REPLAY BLOCKS
 - reset database
 - in config.py set `DEV = True`
 - in config.py test True, False, int() of `REPLAY`
@@ -332,7 +332,7 @@ it just sees "pending" vs "paid/aborted" line items
 - script should not create duplicates in stakes database when replaying
 - check state of `receipts` and `stakes` database tables
 
-# 5) CLIENT AND ADMIN MEMOS
+### 5) CLIENT AND ADMIN MEMOS
 - reset database
 - with config.py set `DEV = False` and `1000` added to the list of `INVEST_AMOUNTS`
 - test login functionality
@@ -370,7 +370,7 @@ This software is sponsored and managed by BitShares Management Group Limited
 
 `RELEASE STATUS`
 
-# feature complete ALPHA - actively testing - peer review appreciated
+### feature complete ALPHA - actively testing - peer review appreciated
 
 `DEVELOPERS`
 
