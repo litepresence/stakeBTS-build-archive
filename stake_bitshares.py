@@ -26,22 +26,9 @@ from bitshares.memo import Memo
 
 # STAKE BTS IMPORTS
 from bittrex_api import Bittrex
-from config import (
-    BITTREX_1,
-    BITTREX_2,
-    BITTREX_3,
-    BITTREX_ACCT,
-    BROKER,
-    DB,
-    DEV,
-    EMAIL,
-    INTEREST,
-    INVEST_AMOUNTS,
-    MANAGERS,
-    NODE,
-    PENALTY,
-    REPLAY,
-)
+from config import (BITTREX_1, BITTREX_2, BITTREX_3, BITTREX_ACCT, BROKER, DB,
+                    DEV, EMAIL, INTEREST, INVEST_AMOUNTS, MANAGERS, NODE,
+                    PENALTY, REPLAY)
 
 # GLOBAL CONSTANTS
 MUNIX_MONTH = 86400 * 30 * 1000
@@ -124,7 +111,7 @@ def post_withdrawal_bittrex(amount, client, api, keys):
     :return str(msg): withdrawal response from bittrex
     """
     amount = int(amount)
-    msg = f"POST WITHDRAWAL BITTREX {amount} {client} {api}"
+    msg = f"POST WITHDRAWAL BITTREX {amount} {client} {api}, response: "
     print(it("yellow", msg))
     if not DEV:
         try:
@@ -136,7 +123,7 @@ def post_withdrawal_bittrex(amount, client, api, keys):
                 "quantity": str(float(amount)),
                 "cryptoAddress": str(client),
             }
-            msg += str(bittrex_api.post_withdrawal(**params))
+            msg += bittrex_api.post_withdrawal(**params)
         except Exception as error:
             msg = f"bittrex failed to send {amount} to client {client}, due to {error}"
     return msg
@@ -152,13 +139,13 @@ def post_withdrawal_pybitshares(amount, client, memo, keys):
     :return str(msg): withdrawal response from pybitshares wallet
     """
     amount = int(amount)
-    msg = f"POST WITHDRAWAL PYBITSHARES {amount} {client} {memo}"
+    msg = f"POST WITHDRAWAL PYBITSHARES {amount} {client} {memo}, response: "
     print(it("yellow", msg))
     if not DEV:
         try:
             bitshares, _ = pybitshares_reconnect()
             bitshares.wallet.unlock(keys["password"])
-            msg += str(
+            msg += json_dumps(
                 bitshares.transfer(client, amount, "BTS", memo, account=keys["broker"])
             )
             bitshares.wallet.lock()
@@ -222,7 +209,7 @@ def set_block_num_database(block_num, con):
     :param int(block_num): the bitshares block number last checked by the bot
     """
     cur = con.cursor()
-    query = "UPDATE block SET block=?"
+    query = "UPDATE block_num SET block_num=?"
     values = (block_num,)
     cur.execute(query, values)
     # commit the database edit
@@ -234,7 +221,7 @@ def get_block_num_database(con):
     what is the last block number checked in the database?
     """
     cur = con.cursor()
-    query = "SELECT block FROM block"
+    query = "SELECT block_num FROM block_num"
     cur.execute(query)
     block_num = int(cur.fetchall()[0][0])
     return block_num
@@ -272,8 +259,9 @@ def stake_start(params, con, keys=None):
     processed   - unix when the payment was processed
     status      - pending, paid, premature, aborted
     number      - the interest payment number, eg 1,2,3; 0 for all other payment types
+    :called by serve_client():
     :params int(nonce): munix timestamp *originally* associated with this stake
-    :params int(block): block number when this stake began
+    :params int(block_num): block_num number when this stake began
     :params str(client): bitshares username of staking client
     :params int(amount): the amount the client is staking
     :params int(months): the number of months the client is staking
@@ -282,13 +270,13 @@ def stake_start(params, con, keys=None):
     :return None:
     """
     # localize parameters
-    nonce, block, client, amount, months = map(
-        params.get, ("nonce", "block", "client", "amount", "months")
+    nonce, block_num, client, amount, months = map(
+        params.get, ("nonce", "block_num", "client", "amount", "months")
     )
     # keys are None when using import_data.py to add existing contracts
     if keys is not None:
         # send confirmation receipt to client with memo using pybitshares
-        memo = f"{months} stake contract for {amount} BTS received timestamp {nonce}"
+        memo = f"{months} month stake contract for {amount} BTS received at {nonce}"
         memo += post_withdrawal_pybitshares(1, client, memo, keys)
         memo += json_dumps(params)
         update_receipt_database(nonce, memo, con)
@@ -310,10 +298,12 @@ def stake_start(params, con, keys=None):
         nonce,  # due now
         nonce,  # processed now
         "paid",
-        block,
+        block_num,
         NINES,
         0,
     )
+    print(query)
+    print(values)
     cur.execute(query, values)
     # insert the principal into the stakes database
     query = (
@@ -331,13 +321,12 @@ def stake_start(params, con, keys=None):
         nonce + months * MUNIX_MONTH,  # due at end of term
         0,
         "pending",
-        block,
+        block_num,
         NINES,
         0,
     )
     print(query)
     print(values)
-    print([type(i) for i in values])
     cur.execute(query, values)
     # insert the early exit penalty into the stakes database
     query = (
@@ -355,7 +344,7 @@ def stake_start(params, con, keys=None):
         nonce + months * MUNIX_MONTH,  # due at end of term
         0,
         "pending",
-        block,
+        block_num,
         NINES,
         0,
     )
@@ -377,10 +366,12 @@ def stake_start(params, con, keys=None):
             nonce + month * MUNIX_MONTH,  # due monthly
             0,
             "pending",
-            block,
+            block_num,
             NINES,
             month,
         )
+        print(query)
+        print(values)
         cur.execute(query, values)
     # commit the database edit
     con.commit()
@@ -391,13 +382,13 @@ def stake_stop(params, con, keys):
     send principal less penalty from pybitshares wallet
     update database with principal and penalty paid; outstanding interest aborted
     :param int(nonce): munix timestamp *originally* associated with this stake
-    :param int(block): block number when this stake began
+    :param int(block_num): block number when this stake began
     :param str(client): bitshares username of staking client
     :param dict(keys): pybitshares wallet password
     :return None:
     """
     # localize parameters
-    nonce, block, client = map(params.get, ("nonce", "block", "client"))
+    nonce, block_num, client = map(params.get, ("nonce", "block_num", "client"))
     # open db connection and query principal and and penalties due to client
     cur = con.cursor()
     query = (
@@ -407,7 +398,7 @@ def stake_stop(params, con, keys):
     values = (client,)
     cur.execute(query, values)
     # principal less penalty
-    amount = int(sum(cur.fetchall()))
+    amount = int(sum([i[0] for i in cur.fetchall()]))
     # send premature payment to client
     params["amount"] = amount
     params["number"] = 0
@@ -415,27 +406,27 @@ def stake_stop(params, con, keys):
     thread = Thread(target=payment_child, args=(deepcopy(params), keys,),)
     thread.start()
     # update stakes database for principal, penalties, and interest payments
-    # with new status, time processed, and block number
+    # with new status, time processed, and block_num number
     query = (
         "UPDATE stakes "
         + "SET status='premature', processed=?, block_processed=? "
         + "WHERE client=? AND status='pending' AND type='principal'"
     )
-    values = (nonce, block, client)
+    values = (nonce, block_num, client)
     cur.execute(query, values)
     query = (
         "UPDATE stakes "
         + "SET status='paid', processed=?, block_processed=? "
         + "WHERE client=? AND status='pending' AND type='penalty'"
     )
-    values = (nonce, block, client)
+    values = (nonce, block_num, client)
     cur.execute(query, values)
     query = (
         "UPDATE stakes "
         + "SET status='aborted', processed=?, block_processed=? "
         + "WHERE client=? AND status='pending' AND type='interest'"
     )
-    values = (nonce, block, client)
+    values = (nonce, block_num, client)
     cur.execute(query, values)
     # commit the database edit
     con.commit()
@@ -483,12 +474,9 @@ def serve_client(params, con, keys):
         params.get, ("memo", "amount", "client", "block_num"),
     )
     # new client wants to stake and used a valid memo
-    if memo["type"] in [
-        "three_months",
-        "six_months",
-        "twelve_months",
-    ]:
+    if memo["type"] in MONTHS:
         months = MONTHS[memo["type"]]
+        params.update({"months": months})
         # client sent a valid amount and memo to start a new stake
         msg = (
             f"received new stake from {client} in {block_num} "
@@ -564,8 +552,8 @@ def serve_invalid(params, keys):
         params.get, ("memo", "amount", "client", "nonce", "block_num")
     )
     request_type = {
-        "client_memo": memo in CLIENT_MEMOS,  # bool()
-        "admin_memo": memo in ADMIN_MEMOS,  # bool()
+        "client_memo": memo["type"] in CLIENT_MEMOS,  # bool()
+        "admin_memo": memo["type"] in ADMIN_MEMOS,  # bool()
         "admin": client in MANAGERS,  # bool()
         "invest_amount": amount in INVEST_AMOUNTS,  # bool()
         "ltm": Account(client).is_ltm,  # bool()
@@ -573,7 +561,7 @@ def serve_invalid(params, keys):
         "amount": amount,  # amount sent by client
         "client": client,  # bitshares user name
         "nonce": nonce,  # start time of this ticket
-        "block": block_num,  # block number client sent funds
+        "block_num": block_num,  # block number client sent funds
     }
 
     msg = "invalid request "
@@ -604,22 +592,6 @@ def check_block(block_num, block, con, keys):
     :param dict(keys): bittrex api keys and pybitshares wallet password
     :return None:
     """
-
-    def get_json_memo(keys, trx):
-        """
-        using the memo key, decrypt the memo in the client's deposit
-        """
-        msg = {"type": "invalid"}
-        try:
-            _, memo = pybitshares_reconnect()
-            memo.blockchain.wallet.unlock(keys["password"])
-            decrypted_memo = memo.decrypt(trx[1]["memo"])
-            memo.blockchain.wallet.lock()
-            msg = json_loads(decrypted_memo)
-        except Exception:
-            pass
-        return msg
-
     for trx in block["transactions"]:
         for ops in trx["operations"]:
             # if it is a BTS transfer to the broker managed account
@@ -628,14 +600,20 @@ def check_block(block_num, block, con, keys):
                 and Account(ops[1]["to"]).name == keys["broker"]  # transfer to me
                 and str(ops[1]["amount"]["asset_id"]) == "1.3.0"  # of BTS core token
             ):
-                # provide timestamp, extract amount and client, dedode the memo
-                msg = ""
-                memo = get_json_memo(keys, ops)
                 nonce = munix()
                 client = Account(ops[1]["from"]).name
                 amount = int(
                     ops[1]["amount"]["amount"] / 10 ** Asset("1.3.0").precision
                 )
+                msg = (
+                    f"transfer of {amount} BTS to broker from {client} "
+                    + "in block {block_num}"
+                )
+                update_receipt_database(nonce, msg, con)
+                print(msg)
+                # provide timestamp, extract amount and client, dedode the memo
+                msg = ""
+                memo = get_json_memo(keys, ops)
                 params = {
                     "client": client,
                     "amount": amount,
@@ -647,12 +625,14 @@ def check_block(block_num, block, con, keys):
                 print(it("green", "incoming transaction to broker"))
                 print(it("green", json_dumps(params)))
                 # handle requests to start and stop stakes
-                if memo in CLIENT_MEMOS and amount in INVEST_AMOUNTS:
+                if memo["type"] == "stop" or (
+                    memo["type"] in CLIENT_MEMOS and amount in INVEST_AMOUNTS
+                ):
                     msg = serve_client(params, con, keys)
                 # handle admin requests to move funds
                 elif (
                     client in MANAGERS
-                    and memo in ADMIN_MEMOS
+                    and memo["type"] in ADMIN_MEMOS
                     and Account(client).is_ltm
                 ):
                     msg = serve_admin(params, keys)
@@ -660,6 +640,29 @@ def check_block(block_num, block, con, keys):
                 else:
                     msg = serve_invalid(params, keys)
                 update_receipt_database(nonce, msg, con)
+
+
+def get_json_memo(keys, trx):
+    """
+    using the memo key, decrypt the memo in the client's deposit
+    """
+    try:
+        _, memo = pybitshares_reconnect()
+        memo.blockchain.wallet.unlock(keys["password"])
+        decrypted_memo = memo.decrypt(trx[1]["memo"])
+        print(decrypted_memo)
+        memo.blockchain.wallet.lock()
+        try:
+            msg = json_loads(decrypted_memo)
+        except Exception:
+            msg = {"type": decrypted_memo}
+        print(msg)
+        if "type" in msg:
+            if msg["type"] in CLIENT_MEMOS + ADMIN_MEMOS:
+                return msg
+    except Exception:
+        pass
+    return {"type": "invalid"}
 
 
 # PAYMENTS
@@ -831,7 +834,7 @@ def listener_sql(keys):
     while True:
         # get millesecond timestamp and current block number
         now = munix()
-        block = get_block_num_current()
+        block_num = get_block_num_current()
         # open the database
         cur = con.cursor()
         # read from database
@@ -866,7 +869,7 @@ def listener_sql(keys):
             + "SET status='processing', block_processed=?, processed=? "
             + "WHERE (type='principal' OR type='interest') AND due<? AND status='pending'"
         )
-        values = (block, now, now)
+        values = (block_num, now, now)
         cur.execute(query, values)
         # update penalties due to status aborted
         query = (
@@ -874,7 +877,7 @@ def listener_sql(keys):
             + "SET status='aborted', block_processed=?, processed=? "
             + "WHERE type='penalty' AND due<? AND status='pending'"
         )
-        values = (block, now, now)
+        values = (block_num, now, now)
         cur.execute(query, values)
         # commit the database edit then make the payments due
         con.commit()
@@ -974,10 +977,10 @@ def login():
                 f"\nInput Pybitshares Password for {BROKER} and press ENTER:\n"
             ),
             "api_1_key": getpass("\nInput Bittrex API 1 Key and press ENTER:\n"),
-            "api_1_secret": getpass("\nInput Bittrex API 1 Secret and press ENTER:\n"),
             "api_2_key": getpass("\nInput Bittrex API 2 Key and press ENTER:\n"),
-            "api_2_secret": getpass("\nInput Bittrex API 2 Secret and press ENTER:\n"),
             "api_3_key": getpass("\nInput Bittrex API 3 Key and press ENTER:\n"),
+            "api_1_secret": getpass("\nInput Bittrex API 1 Secret and press ENTER:\n"),
+            "api_2_secret": getpass("\nInput Bittrex API 2 Secret and press ENTER:\n"),
             "api_3_secret": getpass("\nInput Bittrex API 3 Secret and press ENTER:\n"),
         }
         authenticated = authenticate(keys)
