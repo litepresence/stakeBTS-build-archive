@@ -21,9 +21,23 @@ for bitsharesmanagement.group to stakeBTS clients
 sudo apt install -y sqlite3
 ```
 
-**Create stake_bitshares.db from db_setup.txt file:**
+**Create stake_bitshares.db**
+**set up the tables with db_setup.py file:**
+**check the schema and that the stake table is empty**
 ```
 sqlite3 stake_bitshares.db
+
+.quit
+
+python3.8 db_setup.py
+
+sqlite3 stake_bitshares.db
+
+.schema stakes
+.schema block
+.schema receipts
+
+SELECT * FROM stakes;
 
 .quit
 ```
@@ -277,28 +291,41 @@ Once the main bot is running
 it won't know the difference between old contracts and new.
 it just sees "pending" vs "paid/aborted" line items
 
+`RESET DATABASE`
+
+- `rm stake_bitshares.db`
+- `sqlite3 stake_bitshares.db`
+- `.schema`
+- `.quit`
+
 `UNIT TESTING CHECKLIST`
 
 # 1) BALANCES AND WITHDRAWALS
 - in a seperate script import withdrawal and balances definitions:
 - unit test `post_withdrawal_bittrex()` and `post_withdrawal_pybitshares()`
-- test test `get_balance_bittrex()` and `get_balance_pybitshares()`
+- unit test `get_balance_bittrex()` and `get_balance_pybitshares()`
 
 # 2) BLOCK OPERATIONS LISTENER
-- delete database, recreate empty database, print database schema
+- reset database
 - in config.py set `DEV = True`
 - send 0.1 BTS to broker, ensure script hears it arrive to the `BROKER` account.
 - check state of `receipts` and `stakes` database tables
 
 # 3) DATABASE LISTENER
 - in config.py set `DEV = True`
-- delete database, recreate empty database, print database schema
-- run import_data.py, print database contents
-- via sql, change the due date on a single payment to yesterday, see that it gets paid
+- reset database
+- load old contracts:
+- - `python3.8 import_data.py`
+- print database contents:
+- - `sqlite3 stake_bitshares.db`
+- - `SELECT * FROM stakes;`
+- via sql, change the due date on a single payment to 0, see that it gets paid
+- - `sqlite3 stake_bitshares.db`
+- - `UPDATE stakes SET due=0 WHERE client='user1234' AND number=6;`
 - check state of `receipts` and `stakes` database tables
 
 # 4) REPLAY BLOCKS
-- delete database, recreate empty database, print database schema
+- reset database
 - in config.py set `DEV = True`
 - in config.py test True, False, int() of `REPLAY`
 - ensure script starts at correct block number
@@ -306,7 +333,7 @@ it just sees "pending" vs "paid/aborted" line items
 - check state of `receipts` and `stakes` database tables
 
 # 5) CLIENT AND ADMIN MEMOS
-- delete database, recreate empty database, print database schema
+- reset database
 - with config.py set `DEV = False` and `1000` added to the list of `INVEST_AMOUNTS`
 - test login functionality
 - send an invalid amount
