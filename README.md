@@ -21,22 +21,19 @@ for bitsharesmanagement.group to stakeBTS clients
 sudo apt install -y sqlite3
 ```
 
+**create database folder**
 **Create stake_bitshares.db**
 **set up the tables with db_setup.py file:**
 **check the schema and that the stake table is empty**
 ```
-sqlite3 stake_bitshares.db
-
-.quit
+mkdir database
+cd database
 
 python3.8 db_setup.py
-
 sqlite3 stake_bitshares.db
-
 .schema stakes
 .schema block
 .schema receipts
-
 SELECT * FROM stakes;
 
 .quit
@@ -294,7 +291,7 @@ it just sees "pending" vs "paid/aborted" line items
 `RESET DATABASE`
 
 - `rm stake_bitshares.db`
-- `sqlite3 stake_bitshares.db`
+- `python3.8 db_setup.py`
 - `.schema`
 - `.quit`
 
@@ -332,19 +329,30 @@ it just sees "pending" vs "paid/aborted" line items
 - script should not create duplicates in stakes database when replaying
 - check state of `receipts` and `stakes` database tables
 
-### 5) CLIENT AND ADMIN MEMOS
+### 5) CLIENT MEMOS
 - reset database
-- with config.py set `DEV = False` and `1000` added to the list of `INVEST_AMOUNTS`
-- test login functionality
-- send an invalid amount
-- send an invalid memo
-- send a valid amount `1000` and valid memo to start a new stake
-- send signal to stop a stake
+- with config.py set `DEV = False` and `100` added to the list of `INVEST_AMOUNTS`
+- send an invalid amount `99`
+- send an invalid memo `fail_memo`
+- send a valid amount `100` and valid memo to start a new stake
+- send memo to `stop` a stake
+
+### 6) ADMIN MEMOS
 - using a `MANAGER` account test admin memos (with and without `LTM`)
  - `bmg_to_bittrex`
  - `bittrex_to_bmg`
  - `loan_to_bmg`
 - check state of `receipts` and `stakes` database tables
+
+### 7) BITTREX COVER
+- reset database
+- send 1000 BTS to Bittrex
+- with config.py set `DEV = False` and `100` added to the list of `INVEST_AMOUNTS`
+- send a valid amount `100` and valid memo to start a new stake
+- empty the broker account
+- send memo to `stop` a stake
+- bot should move funds from bittrex to pybitshares wallet, then to client to cover
+- ideally this should be tested with various amounts in all 3 Bittrex wallets
 
 `FEATURES`
 
