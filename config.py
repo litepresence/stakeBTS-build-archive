@@ -32,4 +32,5 @@ INVEST_AMOUNTS = [
 # int() : start from user specified block number
 REPLAY = False
 # UNIT TESTING MODE
-DEV = True
+DEV = False
+ADMIN_REPLAY = False
