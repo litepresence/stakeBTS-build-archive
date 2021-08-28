@@ -3,16 +3,16 @@ BitShares.org StakeMachine
 Import Old Contracts to Database Upon Initialization
 BitShares Management Group Co. Ltd.
 """
-# STANDARD IMPORTS
+
+# STANDARD MODULES
 import datetime
 from sqlite3 import connect as sql
 
-# PYBITSHARES IMPORTS
-from stake_bitshares import pybitshares_reconnect, stake_start
+# STAKEBTS MODULES
 from config import DB
-
-# STAKEBTS IMPORTS
 from preexisting_contracts import STAKES
+from rpc import pybitshares_reconnect
+from stake_bitshares import stake_start
 
 # USER DEFINED CONSTANTS
 JUNE30 = 1625011200000

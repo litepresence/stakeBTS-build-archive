@@ -4,36 +4,34 @@ unit test "get balance" and "post withdrawal" to bittrex and local pybitshares w
 BitShares Management Group Co. Ltd.
 """
 
-from stake_bitshares.py import (
-    post_withdrawal_bittrex,
-    post_withdrawal_pybitshares,
-    get_balance_bittrex,
-    get_balance_pybitshares,
-    login,
-)
-from config import BROKER
+# STAKE BTS MODULES
+from dev_auth import KEYS
+from rpc import (get_balance_bittrex, get_balance_pybitshares,
+                 post_withdrawal_bittrex, post_withdrawal_pybitshares)
 
-print("\033c")
-print("for this unit test you can input same api keys for all bittex accounts")
+# USER DEFINED CONSTANTS
+AMOUNT = 1
+CLIENT = "litepresence1"
+API = 1
+MEMO = "hello world"
 
-input("\npress Enter to continue\n")
-keys = login()
 
-print("get_balance_bittrex",    get_balance_bittrex(keys))
-print("get_balance_pybitshares",    get_balance_pybitshares())
+def main():
+    """
+    test get balances and post withdrawals
+    """
+    print("get_balance_bittrex", get_balance_bittrex(KEYS))
+    print("get_balance_pybitshares", get_balance_pybitshares())
+    print(
+        f"post_withdrawal_bittrex({AMOUNT}, {CLIENT}, {API}, keys)",
+        post_withdrawal_bittrex(AMOUNT, CLIENT, API, KEYS),
+    )
+    print(
+        f"post_withdrawal_pybitshares({AMOUNT}, {CLIENT}, {MEMO}, keys)",
+        post_withdrawal_pybitshares(AMOUNT, CLIENT, MEMO, KEYS),
+    )
 
-amount = 1
-client = BROKER
-api = 1
-memo = "hello world"
 
-print(
-    f"post_withdrawal_bittrex({amount}, {client}, keys, {api})",
-    post_withdrawal_bittrex(amount, client, keys, api)
-)
+if __name__ == "__main__":
 
-print(
-    f"post_withdrawal_pybitshares({amount}, {client}, keys, {memo})"
-    post_withdrawal_pybitshares(amount, client, keys, memo)
-)
-
+    main()

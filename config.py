@@ -3,13 +3,14 @@ BitShares.org StakeMachine
 User Input
 BitShares Management Group Co. Ltd.
 """
+
 # USER DEFINED CONSTANTS
-DB = "stake_bitshares.db"
-NODE = "wss://node.market.rudex.org"
+DB = "database/stake_bitshares.db"
+NODE = "wss://api.bts.mobi"
 EMAIL = "complaints@stakebts.bitsharesmanagement.group"
 BROKER = "bitsharesmanagement.group"
 MANAGERS = ["dls.cipher", "escrow.zavod.premik"]
-BITTREX_ACCT = "bittrex_deposit"
+BITTREX_ACCT = "bittrex-deposit"
 BITTREX_1 = ""  # deposit memo account 1
 BITTREX_2 = ""  # deposit memo account 2
 BITTREX_3 = ""  # deposit memo account 3

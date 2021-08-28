@@ -2,7 +2,7 @@
 # StakeBTS Python Bot
 
 `APP VERSION`
-**v2.0**
+**v2.1**
 
 `PYTHON VERSION`
 **3.8+**
@@ -10,6 +10,14 @@
 `PYTHON REQUIREMENTS`
 **bitshares**
 **uptick**
+
+`LICENSE`
+
+# BIPCOT v1.2 www.bipcot.org
+
+`RELEASE STATUS`
+
+### Unit Tested, Feature Complete Release Candidate
 
 `DESCRIPTION`
 Recurring interest and principal payment automation
@@ -290,10 +298,8 @@ it just sees "pending" vs "paid/aborted" line items
 
 `RESET DATABASE`
 
-- `rm stake_bitshares.db`
 - `python3.8 db_setup.py`
-- `.schema`
-- `.quit`
+
 
 `UNIT TESTING CHECKLIST`
 
@@ -348,7 +354,12 @@ it just sees "pending" vs "paid/aborted" line items
 - reset database
 - send 1000 BTS to Bittrex
 - with config.py set `DEV = False` and `100` added to the list of `INVEST_AMOUNTS`
-- send a valid amount `100` and valid memo to start a new stake
+- insert line item in `stakes` table with amount ~500 BTS more than balance of BROKER:
+- - `INSERT INTO`
+- - `stakes`
+- - `(client, token, amount, type, start, due, processed, status, block_start, block_processed, number)`
+- - `VALUES`
+- - `('user1234', 'BTS', BALANCE_BROKER, 'interest', 0, 0, 0, 'pending', 0, 0, 1)`
 - empty the broker account
 - send memo to `stop` a stake
 - bot should move funds from bittrex to pybitshares wallet, then to client to cover
@@ -371,14 +382,6 @@ Conduct an security review commensurate with your investment.
 
 This software is sponsored and managed by BitShares Management Group Limited
 - www.bitshares.org
-
-`LICENSE`
-
-# WTFPL
-
-`RELEASE STATUS`
-
-### feature complete ALPHA - actively testing - peer review appreciated
 
 `DEVELOPERS`
 

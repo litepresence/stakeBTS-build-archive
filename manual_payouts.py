@@ -3,12 +3,14 @@ BitShares.org StakeMachine
 Hung Payment Handler
 BitShares Management Group Co. Ltd.
 """
-# STANDARD PYTHON IMPORTS
+
+# STANDARD PYTHON MODULES
 from getpass import getpass
 
-# STAKE BTS IMPORTS
-from stake_bitshares import sql_db, munix, payment_parent
+# STAKE BTS MODULES
 from config import BROKER
+from stake_bitshares import payment_parent
+from utilities import munix, sql_db
 
 
 def main():

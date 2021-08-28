@@ -4,45 +4,28 @@ Interest Payments on Staking
 BitShares Management Group Co. Ltd.
 """
 # DISABLE SELECT PYLINT TESTS
-# pylint: disable=broad-except, bad-continuation, invalid-name
-
-# STANDARD IMPORTS
-import inspect
+# pylint: disable=broad-except, invalid-name, bad-continuation
+# STANDARD MODULES
 import time
 from copy import deepcopy
 from getpass import getpass
 from json import dumps as json_dumps
 from json import loads as json_loads
-from sqlite3 import connect as sql
 from threading import Thread
 
-# PYBITSHARES IMPORTS
+# PYBITSHARES MODULES
 from bitshares.account import Account
 from bitshares.asset import Asset
-from bitshares.bitshares import BitShares
 from bitshares.block import Block
-from bitshares.instance import set_shared_bitshares_instance
-from bitshares.memo import Memo
 
-# STAKE BTS IMPORTS
-from bittrex_api import Bittrex
-from config import (
-    ADMIN_REPLAY,
-    BITTREX_1,
-    BITTREX_2,
-    BITTREX_3,
-    BITTREX_ACCT,
-    BROKER,
-    DB,
-    DEV,
-    EMAIL,
-    INTEREST,
-    INVEST_AMOUNTS,
-    MANAGERS,
-    NODE,
-    PENALTY,
-    REPLAY,
-)
+# STAKE BTS MODULES
+from config import (ADMIN_REPLAY, BITTREX_1, BITTREX_2, BITTREX_3,
+                    BITTREX_ACCT, BROKER, DEV, EMAIL, INTEREST, INVEST_AMOUNTS,
+                    MANAGERS, PENALTY, REPLAY)
+from rpc import (authenticate, get_balance_bittrex, get_balance_pybitshares,
+                 get_block_num_current, post_withdrawal_bittrex,
+                 post_withdrawal_pybitshares, pybitshares_reconnect)
+from utilities import exception_handler, it, munix, munix_nonce, sql_db
 
 # GLOBAL CONSTANTS
 MUNIX_MONTH = 86400 * 30 * 1000
@@ -57,226 +40,12 @@ ADMIN_MEMOS = [
     "bmg_to_bittrex",  # manager moves funds from bitsharemanagment.group to bittrex
     "loan_to_bmg",  # manager makes personal loan to bitsharesmanagement.group
 ]
-MONTHS = {
+MONTHS = {  # word phrase to number conversion
     "three_months": 3,
     "six_months": 6,
     "twelve_months": 12,
 }
-NINES = 999999999
-
-# UTILITIES
-def it(style, text, foreground=True):
-    """
-    Color printing in terminal
-    """
-    lie = 4
-    if foreground:
-        lie = 3
-    if isinstance(style, tuple):  # RGB
-        return f"\033[{lie}8;2;{style[0]};{style[1]};{style[2]}m{str(text)}\033[0;00m"
-    if isinstance(style, int):  # xterm-256
-        return f"\033[{lie}8;5;{style}m{str(text)}\033[0;00m"
-    # 6 color emphasis dict
-    emphasis = {
-        "red": 91,
-        "green": 92,
-        "yellow": 93,
-        "blue": 94,
-        "purple": 95,
-        "cyan": 96,
-    }
-    return f"\033[{emphasis[style]}m{str(text)}\033[0m"
-
-
-def munix():
-    """
-    millesecond unix time stamp
-    """
-    return int(1000 * time.time())
-
-
-def line_info():
-    """
-    :return tuple(current filename, function, and line number:
-    """
-    info = inspect.getframeinfo(inspect.stack()[1][0])
-    return it("red", "function " + str(info.function) + " line " + str(info.lineno))
-
-
-def exception_handler(error):
-    """
-    :return str(): formatted error name and args
-    """
-    return it("red", f"{type(error).__name__} {error.args}")
-
-
-def sql_db(query, values=()):
-    """
-    execute discrete sql queries, handle race condition gracefully
-    """
-    if (
-        "UPDATE block_num" not in query
-        and "SELECT" not in query
-        and "SET status='processing'" not in query
-        and "status='aborted', block_processed=?, processed=? WHERE type='penalty'"
-        not in query
-    ):
-        print(it("yellow", f"query: {query} values: {values}"))
-    pause = 0
-    curfetchall = None
-    while True:
-        try:
-            con = sql(DB)
-            cur = con.cursor()
-            cur.execute(query, values)
-            if "SELECT" in query:
-                curfetchall = cur.fetchall()
-            else:
-                con.commit()
-            break
-        # OperationalError: database is locked
-        except Exception as error:
-            print(exception_handler(error), line_info())
-            time.sleep(0.1 * 2 ** pause)
-            pause += 1
-            continue
-    con.close()
-    return curfetchall
-
-
-# CONNECT WALLET TO BITSHARES NODE
-def pybitshares_reconnect():
-    """
-    create locked owner and memo instances of the pybitshares wallet
-    """
-    bitshares = BitShares(node=NODE, nobroadcast=False)
-    set_shared_bitshares_instance(bitshares)
-    memo = Memo(blockchain_instance=bitshares)
-    return bitshares, memo
-
-
-# RPC POST WITHDRAWALS
-def post_withdrawal_bittrex(amount, client, api, keys):
-    """
-    send funds using the bittrex api
-    :param int(amount): quantity to be withdrawn
-    :param str(client): bitshares username to send to
-    :param dict(keys): api keys and secrets for bittrex accounts
-    :param int(api): 1, 2, or 3; corporate account to send from
-    :return str(msg): withdrawal response from bittrex
-    """
-    amount = int(amount)
-    msg = f"POST WITHDRAWAL BITTREX {amount} {client} {api}, response: "
-    print(it("yellow", msg))
-    if not DEV:
-        try:
-            if amount <= 0:
-                raise ValueError(f"Invalid Withdrawal Amount {amount}")
-            bittrex_api = Bittrex(
-                api_key=keys[f"api_{api}_key"], api_secret=keys[f"api_{api}_secret"]
-            )
-            params = {
-                "currencySymbol": "BTS",
-                "quantity": str(float(amount)),
-                "cryptoAddress": str(client),
-            }
-            # returns response.json() as dict or list python object
-            ret = bittrex_api.post_withdrawal(**params)
-            msg += json_dumps(ret)
-            if isinstance(ret, dict):
-                if "code" in ret:
-                    print(it("red", ret), line_info())
-                    raise TypeError("Bittrex failed with response code")
-        except Exception as error:
-            msg += line_info() + " " + exception_handler(error)
-            msg += it("red", f"bittrex failed to send {amount} to client {client}",)
-            print(msg)
-    return msg
-
-
-def post_withdrawal_pybitshares(amount, client, memo, keys):
-    """
-    send BTS with memo to confirm new stake from pybitshares wallet
-    :param int(amount): quantity to be withdrawn
-    :param str(client): bitshares username to send to
-    :param dict(keys): contains pybitshares wallet password for corporate account
-    :param str(memo): message to client
-    :return str(msg): withdrawal response from pybitshares wallet
-    """
-    amount = int(amount)
-    msg = f"POST WITHDRAWAL PYBITSHARES {amount} {client} {memo}, response: "
-    print(it("yellow", msg))
-    if not DEV:
-        try:
-            if amount <= 0:
-                raise ValueError(f"Invalid Withdrawal Amount {amount}")
-            bitshares, _ = pybitshares_reconnect()
-            bitshares.wallet.unlock(keys["password"])
-            msg += json_dumps(
-                bitshares.transfer(client, amount, "BTS", memo, account=keys["broker"])
-            )  # returns dict
-            bitshares.wallet.lock()
-            bitshares.clear_cache()
-        except Exception as error:
-            msg += line_info() + " " + exception_handler(error)
-            msg += it(
-                "red",
-                f"pybitshares failed to send {amount}"
-                + f"to client {client} with memo {memo}, ",
-            )
-            print(msg)
-    return msg
-
-
-# RPC GET BALANCES
-def get_balance_bittrex(keys):
-    """
-    get bittrex BTS balances for all three corporate accounts
-    :param keys: dict containing api keys and secrets for 3 accounts
-    :return dict(balances):format {1: 0, 2: 0, 3: 0} with int() BTS balance for each api
-    """
-    balances = {1: NINES, 2: NINES, 3: NINES}
-    if not DEV:
-        for api in range(1, 4):
-            balance = 0
-            try:
-                bittrex_api = Bittrex(
-                    api_key=keys[f"api_{api}_key"], api_secret=keys[f"api_{api}_secret"]
-                )
-                # returns list() on success or dict() on error
-                ret = bittrex_api.get_balances()
-                if isinstance(ret, dict):
-                    print(it("red", ret), line_info())
-                # ret balance will be strigified float; int(float(()) to return integer
-                balance = int(
-                    float(
-                        [i for i in ret if i["currencySymbol"] == "BTS"][0]["available"]
-                    )
-                )
-            except Exception as error:
-                print(exception_handler(error), line_info())
-            balances[api] = balance
-    print("bittrex balances:", balances)
-    return balances
-
-
-def get_balance_pybitshares():
-    """
-    get the broker's BTS balance
-    :return int(): BTS balance
-    """
-    try:
-        if DEV:
-            balance = NINES
-        else:
-            _, _ = pybitshares_reconnect()
-            account = Account(BROKER)
-            balance = int(account.balance("BTS")["amount"])
-    except Exception as error:
-        balance = 0
-        print(exception_handler(error), line_info())
-    print("pybitshares balance:", balance)
-    return balance
+NINES = 999999999  # a default big number
 
 
 # SQL DATABASE GET AND SET BLOCK NUMBER
@@ -346,6 +115,8 @@ def stake_start(params, keys=None):
         memo += post_withdrawal_pybitshares(1, client, memo, keys)
         memo += json_dumps(params)
         update_receipt_database(nonce, memo)
+    # batch new stake queries and process them atomically
+    queries = []
     # insert the contract into the stakes database
     query = (
         "INSERT INTO stakes "
@@ -366,7 +137,8 @@ def stake_start(params, keys=None):
         NINES,
         0,
     )
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
     # insert the principal into the stakes database
     query = (
         "INSERT INTO stakes "
@@ -387,7 +159,8 @@ def stake_start(params, keys=None):
         NINES,
         0,
     )
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
     # insert the early exit penalty into the stakes database
     query = (
         "INSERT INTO stakes "
@@ -408,7 +181,8 @@ def stake_start(params, keys=None):
         NINES,
         0,
     )
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
     # insert the interest payments into the stakes database
     for month in range(1, months + 1):
         query = (
@@ -430,14 +204,16 @@ def stake_start(params, keys=None):
             NINES,
             month,
         )
-        sql_db(query, values)
+        dml = {"query": query, "values": values}
+        queries.append(dml)
+    sql_db(queries)
 
 
 def stake_stop(params, keys):
     """
     send principal less penalty from pybitshares wallet
     update database with principal and penalty paid; outstanding interest aborted
-    :param int(nonce): munix timestamp *originally* associated with this stake
+    :param int(nonce): munix timestamp when stop signal was read from blockchain
     :param int(block_num): block number when this stake began
     :param str(client): bitshares username of staking client
     :param dict(keys): pybitshares wallet password
@@ -454,16 +230,8 @@ def stake_stop(params, keys):
     curfetchall = sql_db(query, values)
     # total principals less total penalties
     amount = int(sum([i[0] for i in curfetchall]))
-    # send premature payment to client
-    if amount:
-        params["amount"] = amount
-        params["number"] = 0
-        params["type"] = "stop"
-        thread = Thread(target=payment_child, args=(deepcopy(params), keys,),)
-        thread.start()
-    else:
-        msg = f"{client} sent STOP in block {block_num}, but had no open contracts"
-        update_receipt_database(nonce, msg)
+    # batch stop stake queries and process them atomically
+    queries = []
     # set principal to premature
     # with time and block processed
     query = (
@@ -472,7 +240,8 @@ def stake_stop(params, keys):
         + "WHERE client=? AND status='pending' AND type='principal'"
     )
     values = (nonce, block_num, client)
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
     # set penalty to paid
     query = (
         "UPDATE stakes "
@@ -480,7 +249,8 @@ def stake_stop(params, keys):
         + "WHERE client=? AND status='pending' AND type='penalty'"
     )
     values = (nonce, block_num, client)
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
     # set interest to aborted
     query = (
         "UPDATE stakes "
@@ -488,7 +258,29 @@ def stake_stop(params, keys):
         + "WHERE client=? AND status='pending' AND type='interest'"
     )
     values = (nonce, block_num, client)
-    sql_db(query, values)
+    dml = {"query": query, "values": values}
+    queries.append(dml)
+    sql_db(queries)
+    # SECURITY - make payouts after sql updates
+    # send premature payment to client
+    if amount > 0:
+        params["amount"] = amount
+        params["number"] = 0
+        params["type"] = "stop"
+        thread = Thread(target=payment_child, args=(deepcopy(params), keys,),)
+        thread.start()
+    # no payouts if less than or equal to zero, add receipt to db, and print WARN
+    elif amount < 0:
+        msg = (
+            f"WARN {client} sent STOP in block {block_num}, "
+            + f"but has negative amount {amount} due"
+        )
+        print(it("red", msg))
+        update_receipt_database(nonce, msg)
+    else:
+        msg = f"WARN {client} sent STOP in block {block_num}, but had no open contracts"
+        print(it("red", msg))
+        update_receipt_database(nonce, msg)
 
 
 def stake_paid(params):
@@ -499,6 +291,7 @@ def stake_paid(params):
     :param int(number): the counting number of this interest payment
     :return None:
     """
+    # localize params
     client, nonce, number = map(params.get, ("client", "nonce", "number"))
     query = (
         "UPDATE stakes "
@@ -656,14 +449,6 @@ def decrypt_memo(ciphertext, keys):
     return {"type": "invalid"}
 
 
-def get_block_num_current():
-    """
-    connect to node and get the irreversible block number
-    """
-    bitshares, _ = pybitshares_reconnect()
-    return bitshares.rpc.get_dynamic_global_properties()["last_irreversible_block_num"]
-
-
 def check_block(block_num, block, keys):
     """
     check for client transfers to the broker in this block
@@ -680,10 +465,10 @@ def check_block(block_num, block, keys):
                 and Account(ops[1]["to"]).name == keys["broker"]  # transfer to me
                 and str(ops[1]["amount"]["asset_id"]) == "1.3.0"  # of BTS core token
             ):
-                nonce = munix()
+                nonce = munix_nonce()
                 client = Account(ops[1]["from"]).name
                 amount = int(
-                    ops[1]["amount"]["amount"] / 10 ** Asset("1.3.0").precision
+                    ops[1]["amount"]["amount"] // 10 ** Asset("1.3.0").precision
                 )
                 msg = (
                     f"transfer of {amount} BTS to broker from {client} "
@@ -693,7 +478,9 @@ def check_block(block_num, block, keys):
                 print(msg)
                 # provide timestamp, extract amount and client, dedode the memo
                 msg = ""
-                memo = decrypt_memo(ops[1]["memo"], keys)
+                memo = ""
+                if "memo" in ops[1]:
+                    memo = decrypt_memo(ops[1]["memo"], keys)
                 params = {
                     "client": client,
                     "amount": amount,
@@ -769,30 +556,33 @@ def payment_child(params, keys):
     :param dict(keys): pybitshares wallet password
     :return None:
     """
+    # localize params
     amount, client, nonce, number = map(
         params.get, ("amount", "client", "nonce", "number")
     )
     print(it("green", str(("make payout process", amount, client, nonce, number))))
-
     # calculate need vs check how much funds we have on hand in the brokerage account
     params.update(
-        {"need": amount + 10, "pybitshares_balance": get_balance_pybitshares()}
+        {"need": amount + 100, "pybitshares_balance": get_balance_pybitshares()}
     )
     # if we don't have enough we'll have to move some BTS from bittrex to broker
     covered = True
     if params["pybitshares_balance"] < params["need"]:
         covered = payment_cover(params, keys)
     # assuming we have enough, just pay the client his due
+    # mark as paid, post withdrawal, add receipt to db
     if covered:
         memo = (
             f"Payment for stakeBTS nonce {nonce} type {params['type']} {number}, "
             + "we appreciate your business!"
         )
+        stake_paid(params)
+        # SECURITY - after it has been marked as paid...
         msg = memo + post_withdrawal_pybitshares(amount, client, memo, keys)
         msg += json_dumps(params)
         update_receipt_database(nonce, msg)
-        stake_paid(params)
     # something went wrong, send the client an IOU with support details
+    # do not mark as paid, but add receipt to db
     else:
         memo = (
             f"your stakeBTS payment of {amount} failed for an unknown reason, "
@@ -802,7 +592,6 @@ def payment_child(params, keys):
         msg = memo + post_withdrawal_pybitshares(1, client, memo, keys)
         msg += json_dumps(params)
         update_receipt_database(nonce, msg)
-        # do not mark as paid
 
 
 def payment_cover(params, keys):
@@ -816,9 +605,11 @@ def payment_cover(params, keys):
     :param int(number): the counting number of this interest payment
     :return bool(): whether of not we have enough funds to cover this payment
     """
+    # localize params
     need, pybitshares_balance, nonce = map(
         params.get, ("need", "pybitshares_balance", "nonce")
     )
+    # can we afford to cover client's payout?
     covered = False
     try:
         # calculate our deficit and and fetch our bittrex account balances
@@ -830,22 +621,35 @@ def payment_cover(params, keys):
             for api in range(1, 4):
                 bittrex_available = bittrex_balance[api]
                 if bittrex_available > 510:
+                    # at last check bittrex charges 5 BTS to withdraw
+                    # presume 10 for safe measure
                     qty = min(deficit, bittrex_available - 10)
                     msg = "cover payment"
-                    msg += post_withdrawal_bittrex(qty, BROKER, keys, api)
+                    msg += post_withdrawal_bittrex(qty, BROKER, api, keys)
                     msg += json_dumps(params)
                     update_receipt_database(nonce, msg)
                     deficit -= qty
                     if deficit <= 0:
                         break  # eg. if 1st api has funds stop here
-        # wait up to ten minutes for funds to arrive:
+        # if we had enough funds,
+        # wait up to 6 hours for funds to arrive
+        # breaks on timeout or on receipt of funds
         if deficit <= 0:
-            # breaks on timeout or on receipt of funds
             covered = True
             begin = time.time()
             while get_balance_pybitshares() < need:
-                time.sleep(10)
-                if time.time() - begin > 600:
+                time.sleep(120)
+                # calculate elapsed time in MINUTES
+                elapsed = int((time.time() - begin) / 60)
+                msg = it(
+                    "purple",
+                    f"Awaiting on funds from Bittrex for nonce {nonce}, "
+                    + f"minutes elapsed {elapsed}",
+                )
+                print(msg)
+                # wait up to 12 hours for bittrex funds to arrive
+                if elapsed > 60 * 12:
+                    print(it("purlple", f"WARN: nonce {nonce} funds failed to arrive"))
                     covered = False
                     break
     except Exception as error:
@@ -896,7 +700,6 @@ def listener_sql(keys):
             + "WHERE (type='principal' OR type='interest') AND due<? AND status='pending'"
         )
         values = (now,)
-        # print(query, values)
         payments_due = sql_db(query, values)
         # gather list of contracts that have matured
         query = (
@@ -904,15 +707,15 @@ def listener_sql(keys):
             + "WHERE type='penalty' AND due<? AND status='pending'"
         )
         values = (now,)
-        # print(query, values)
-        closed_contracts = sql_db(query, values)
+        closed_contracts = sql_db(query, values)  # strictly for printing
         print(
             it("green", "payments due"),
             payments_due,
             it("red", "closed contracts"),
             closed_contracts,
         )
-        # write to database
+        # batch payment due queries and process them atomically
+        queries = []
         # update principal and interest due status to processing
         query = (
             "UPDATE stakes "
@@ -920,7 +723,8 @@ def listener_sql(keys):
             + "WHERE (type='principal' OR type='interest') AND due<? AND status='pending'"
         )
         values = (block_num, now, now)
-        sql_db(query, values)
+        dml = {"query": query, "values": values}
+        queries.append(dml)
         # update penalties due to status aborted
         query = (
             "UPDATE stakes "
@@ -928,10 +732,37 @@ def listener_sql(keys):
             + "WHERE type='penalty' AND due<? AND status='pending'"
         )
         values = (block_num, now, now)
-        sql_db(query, values)
+        dml = {"query": query, "values": values}
+        queries.append(dml)
+        sql_db(queries)
         # make the payments due
         payment_parent(payments_due, keys)
-        time.sleep(30)
+        time.sleep(60)
+
+
+def listener_balances(keys):
+    """
+    about every 2 hours update receipts table with current account balances
+    """
+    balances = {0: get_balance_pybitshares()}
+    balances.update(get_balance_bittrex(keys))
+    print(it("purple", "balances"), balances)
+    update_receipt_database(0, json_dumps(balances))
+    now = munix()
+    # read from database gather list of payments due in next 24 hours
+    query = (
+        "SELECT amount FROM stakes "
+        + "WHERE (type='principal' OR type='interest') AND due<? AND status='pending'"
+    )
+    values = (now + 86400 * 1000,)
+    curfetchall = sql_db(query, values)
+    due_today = int(sum([i[0] for i in curfetchall]))
+    print(it("purple", "due today"), due_today)
+    if due_today > balances[0]:
+        print(it("red", "WARN INSUFFICIENT FUNDS IN LOCAL WALLET FOR 24 HOUR EXPENSES"))
+    if due_today > sum(balances.values()):
+        print(it("red", "WARN INSUFFICIENT FUNDS IN ALL WALLETS FOR 24 HOUR EXPENSES"))
+    time.sleep(7195)
 
 
 # PRIMARY EVENT BACKBONE
@@ -963,48 +794,12 @@ def welcome(keys):
     print(time.ctime(), int(1000 * time.time()), "\n")
 
 
-def authenticate(keys):
-    """
-    make authenticated request to pybitshares wallet and bittrex to test login
-    :param dict(keys): bittrex api keys and pybitshares wallet password
-    :return bool(): do all secrets and passwords authenticate?
-    """
-    bitshares, _ = pybitshares_reconnect()
-    try:
-        bitshares.wallet.unlock(keys["password"])
-    except Exception:
-        pass
-    bitshares_auth = bitshares.wallet.unlocked()
-    if bitshares_auth:
-        print("PYBITSHARES WALLET AUTHENTICATED")
-    else:
-        print("PYBITSHARES WALLET AUTHENTICATION FAILED")
-    bitshares.wallet.lock()
-    bittrex_auth = {1: False, 2: False, 3: False}
-    try:
-        for i in range(3):
-            api = i + 1
-            bittrex_api = Bittrex(
-                api_key=keys[f"api_{api}_key"], api_secret=keys[f"api_{api}_secret"]
-            )
-            ret = bittrex_api.get_balances()
-            if isinstance(ret, list):
-                bittrex_auth[api] = True
-    except Exception:
-        pass
-    if all(bittrex_auth.values()):
-        print("BITTREX API SECRETS AUTHENTICATED:", bittrex_auth)
-    else:
-        print("BITTREX API SECRETS FAILED:", bittrex_auth)
-    return bitshares_auth and all(bittrex_auth.values())
-
-
 def login():
     """
     user input login credentials for pybitshares and bittrex
     :return dict(keys): authenticated bittrex api keys and pybitshares wallet password
     """
-
+    # uncomment this code block and create a dev_auth.py to bypass login during dev
     # from dev_auth import KEYS
     # return KEYS
 
@@ -1045,16 +840,17 @@ def main():
     """
     keys = login()
     welcome(keys)
-    # branch into two run forever threads
-    # block operations listener_bitshares for incoming client requests
-    # this thread will contain a continuous while loop
+    # branch into three run forever threads with run forever while loops
+    # ==================================================================================
+    # block operations listener_bitshares() for incoming client requests
     thread_1 = Thread(target=listener_bitshares, args=(keys,))
     thread_1.start()
-    # sql db payout listener_sql for payments now due
-    # this thread will contain a continuous while loop
-    # listener_sql() will launch child payment threads via payment_parent()
+    # listener_sql() check sql db for payments due
     thread_2 = Thread(target=listener_sql, args=(keys,))
     thread_2.start()
+    # listener_balances() periodically updates receipts table with account balances
+    thread_3 = Thread(target=listener_balances, args=(keys,))
+    thread_3.start()
 
 
 if __name__ == "__main__":

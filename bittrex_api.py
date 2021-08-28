@@ -12,16 +12,30 @@ Passes:
     pylint/black/isort/sourcery
 wtfpl litepresence2021
 """
+
+# STANDARD PYTHON MODULES
 import hashlib
 import hmac
 import json
 import time
 from urllib.parse import urlencode
+
+# THIRD PARTY MODULES
 import requests
 
 API_URL = "https://api.bittrex.com/v3/"
 API_KEY = ""  # only for unit testing
 API_SECRET = ""  # only for unit testing
+
+
+def _session():
+    header = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+    session = requests.sessions.Session()
+    session.headers.update(header)
+    return session
 
 
 class Bittrex:
@@ -34,18 +48,9 @@ class Bittrex:
         self.api_key = api_key
         self.api_secret = api_secret
 
-    def _session(self):
-        header = {
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-        }
-        session = requests.sessions.Session()
-        session.headers.update(header)
-        return session
-
     def _request(self, method, endpoint, **kwargs):
         uri = API_URL + endpoint
-        with self._session() as session:
+        with _session() as session:
             self.response = getattr(session, method)(uri, **kwargs)
         return self.response.json()
 
@@ -65,13 +70,21 @@ class Bittrex:
         signature = hmac.new(
             self.api_secret.encode(), _pre_sign.encode(), hashlib.sha512
         ).hexdigest()
-        with self._session() as session:
+        with _session() as session:
             session.headers.update(
                 {
                     "Api-Key": self.api_key,
                     "Api-Timestamp": mill_timestamp,
                     "Api-Content-Hash": content_hash,
                     "Api-Signature": signature,
+                }
+            )
+            print(
+                {
+                    "uri": uri,
+                    "headers": session.headers,
+                    "method": method,
+                    "data": request_data,
                 }
             )
             self.response = getattr(session, method)(uri, **request_data)
@@ -119,6 +132,94 @@ class Bittrex:
         }
         """
         return self._authenticated_request("post", "withdrawals", **params)
+
+    def delete_withdrawal(self, **params):
+        """
+        https://api.bittrex.com/v3/withdrawals
+        https://bittrex.github.io/api/v3#operation--withdrawals--withdrawalId--delete
+        @param withdrawalId str() uuid of withdrawal to cancel
+        :return:
+        {
+          "id": "string (uuid)",
+          "currencySymbol": "string",
+          "quantity": "number (double)",
+          "cryptoAddress": "string",
+          "cryptoAddressTag": "string",
+          "fundsTransferMethodId": "string (uuid)",
+          "txCost": "number (double)",
+          "txId": "string",
+          "status": "string",
+          "createdAt": "string (date-time)",
+          "completedAt": "string (date-time)",
+          "clientWithdrawalId": "string (uuid)",
+          "target": "string",
+          "accountId": "string (uuid)",
+          "error": {
+            "code": "string",
+            "detail": "string",
+            "data": "object"
+          }
+        """
+        return self._authenticated_request("delete", "withdrawals", **params)
+
+    def get_withdrawals_open(self, **params):
+        """
+        List open withdrawals. Results are sorted in inverse order of UpdatedAt,
+        and are limited to the first 1000.
+        @param status optional - string enum
+        @param currencySymbol optional - string
+        :return:
+        [
+          {
+            "id": "string (uuid)",
+            "currencySymbol": "string",
+            "quantity": "number (double)",
+            "cryptoAddress": "string",
+            "cryptoAddressTag": "string",
+            "txCost": "number (double)",
+            "txId": "string",
+            "status": "string",
+            "createdAt": "string (date-time)",
+            "completedAt": "string (date-time)"
+          }
+        ]
+        """
+        return self._authenticated_request("get", "withdrawals/open", **params)
+
+    def get_withdrawals_closed(self, **params):
+        """
+        List closed withdrawals. StartDate and EndDate filters apply to the CompletedAt
+        field. Pagination and the sort order of the results are in inverse order of the
+        CompletedAt field.
+        @param status optional - string enum
+        @param currencySymbol optional - string
+        @param nextPageToken optional - string. The unique identifier of the item that
+            the resulting query result should start after, in the sort order of the
+            given endpoint. Used for traversing a paginated set in the forward direction
+            (Optional. May only be specified if PreviousPageToken is not specified.)
+        @param previousPageToken optional - string. The unique identifier of the item
+            that the resulting query result should end before, in the sort order of the
+            given endpoint. Used for traversing a paginated set in the reverse direction
+            (Optional. May only be specified if NextPageToken is not specified.)
+        @param pageSize optional - integer. maximum number of items to retrieve
+            default 100, minimum 1, maximum 200
+        @param startDate optional - ISO8601. Filters out results before this timestamp
+        @param endDate optional - ISO8601. Filters out results after this timestamp
+        :return:
+        [
+          {
+            "id": "string (uuid)",
+            "currencySymbol": "string",
+            "quantity": "number (double)",
+            "cryptoAddress": "string",
+            "txId": "string",
+            "status": "string",
+            "createdAt": "string (date-time)",
+            "completedAt": "string (date-time)"
+          }
+        ]
+        """
+        return self._authenticated_request("get", "withdrawals/closed", **params)
 
     def get_addresses(self):
         """
