@@ -34,17 +34,7 @@ sudo apt install -y sqlite3
 **set up the tables with db_setup.py file:**
 **check the schema and that the stake table is empty**
 ```
-mkdir database
-cd database
-
 python3.8 db_setup.py
-sqlite3 stake_bitshares.db
-.schema stakes
-.schema block
-.schema receipts
-SELECT * FROM stakes;
-
-.quit
 ```
 
 **Create and activate environment:**
