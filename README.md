@@ -163,13 +163,18 @@ INSERT INTO block (block) VALUES (59120000); # the initial starting block
 `preexisting_contracts.py and import_data.py`
 
 preexisting_contracts.py houses a single global constant of block text in format:
+```
 username milliseconds_unix amount contract_length months_paid
+```
 can be tab or space delimited, eg:
+``` 
     STAKES = """
         user1233 1623177720000 25000 12 2
         user9043 1623176546500 50000  3 2
     """
+```
 import_data.py moves those existing contracts to the database in the same
+
 manner as all other contracts thereafter.
 
 `DISCUSSION`
