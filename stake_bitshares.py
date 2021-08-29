@@ -228,8 +228,6 @@ def stake_stop(params, keys):
     )
     values = (client,)
     curfetchall = sql_db(query, values)
-    # total principals less total penalties
-    amount = int(sum([i[0] for i in curfetchall]))
     # batch stop stake queries and process them atomically
     queries = []
     # set principal to premature
@@ -263,22 +261,24 @@ def stake_stop(params, keys):
     sql_db(queries)
     # SECURITY - make payouts after sql updates
     # send premature payment to client
+    # total principals less total penalties
+    amount = int(sum([i[0] for i in curfetchall]))
+    items_due = len([i[0] for i in curfetchall])
     if amount > 0:
         params["amount"] = amount
         params["number"] = 0
         params["type"] = "stop"
         thread = Thread(target=payment_child, args=(deepcopy(params), keys,),)
         thread.start()
-    # no payouts if less than or equal to zero, add receipt to db, and print WARN
-    elif amount < 0:
-        msg = (
-            f"WARN {client} sent STOP in block {block_num}, "
-            + f"but has negative amount {amount} due"
-        )
-        print(it("red", msg))
-        update_receipt_database(nonce, msg)
     else:
-        msg = f"WARN {client} sent STOP in block {block_num}, but had no open contracts"
+        # no payouts if less than or equal to zero, add receipt to db, and print WARN
+        msg = f"WARN {client} sent STOP in block {block_num}, "
+        if items_due == 0:
+            msg += "but had no open contracts"
+        elif amount == 0:
+            msg += "but principal less penalty equals zero"
+        elif amount < 0:
+            msg += f"but has negative amount {amount} due"
         print(it("red", msg))
         update_receipt_database(nonce, msg)
 
