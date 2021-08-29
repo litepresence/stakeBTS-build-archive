@@ -105,8 +105,7 @@ def mark_prepaid_stakes(stake_matrix, con):
             print(values)
             print([type(i) for i in values])
             cur.execute(query, values)
-        # handle cases where two payments have been sent already
-        if prepaid == 2:
+        elif prepaid == 2:
             block = convert_munix_to_block(JUNE30)
             query = (
                 "UPDATE stakes "

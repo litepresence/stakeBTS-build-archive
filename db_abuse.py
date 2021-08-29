@@ -35,9 +35,7 @@ def main():
     print("you should see occassional OperationalError")
     print("but get and set should continue\n")
     input("press Enter to begin\n")
-    threads = {}
-    for i in range(100):
-        threads[i] = Thread(target=abuse)
+    threads = {i: Thread(target=abuse) for i in range(100)}
     for i in range(100):
         threads[i].start()
 

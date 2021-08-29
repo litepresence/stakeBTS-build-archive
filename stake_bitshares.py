@@ -262,7 +262,7 @@ def stake_stop(params, keys):
     # SECURITY - make payouts after sql updates
     # send premature payment to client
     # total principals less total penalties
-    amount = int(sum([i[0] for i in curfetchall]))
+    amount = int(sum(i[0] for i in curfetchall))
     items_due = len([i[0] for i in curfetchall])
     if amount > 0:
         params["amount"] = amount
@@ -361,12 +361,11 @@ def serve_admin(params, keys):
                 msg = exception_handler(error)
                 print(msg)
                 update_receipt_database(munix(), msg)
-        # the manager wishes to move funds from broker to bittrex
         elif memo["type"] == "bmg_to_bittrex":
             try:
                 transfer_amount = int(memo["amount"])
                 api = int(memo["api"])
-                assert api in [1, 2, 3]
+                assert api in {1, 2, 3}
                 assert transfer_amount > 400
                 decode_api = {1: BITTREX_1, 2: BITTREX_2, 3: BITTREX_3}
                 bittrex_memo = decode_api[api]
@@ -381,7 +380,6 @@ def serve_admin(params, keys):
                 msg = exception_handler(error)
                 print(msg)
                 update_receipt_database(munix(), msg)
-        # the manager has loaned the broker personal funds
         elif memo["type"] == "loan_to_bmg":
             msg = f"{client} has loaned the broker {amount}"
     return msg
@@ -441,9 +439,8 @@ def decrypt_memo(ciphertext, keys):
         except Exception:
             msg = {"type": decrypted_memo}
         print(msg)
-        if "type" in msg:
-            if msg["type"] in CLIENT_MEMOS + ADMIN_MEMOS:
-                return msg
+        if "type" in msg and msg["type"] in CLIENT_MEMOS + ADMIN_MEMOS:
+            return msg
     except Exception:
         pass
     return {"type": "invalid"}
@@ -478,9 +475,7 @@ def check_block(block_num, block, keys):
                 print(msg)
                 # provide timestamp, extract amount and client, dedode the memo
                 msg = ""
-                memo = ""
-                if "memo" in ops[1]:
-                    memo = decrypt_memo(ops[1]["memo"], keys)
+                memo = decrypt_memo(ops[1]["memo"], keys) if "memo" in ops[1] else ""
                 params = {
                     "client": client,
                     "amount": amount,
@@ -579,10 +574,6 @@ def payment_child(params, keys):
         stake_paid(params)
         # SECURITY - after it has been marked as paid...
         msg = memo + post_withdrawal_pybitshares(amount, client, memo, keys)
-        msg += json_dumps(params)
-        update_receipt_database(nonce, msg)
-    # something went wrong, send the client an IOU with support details
-    # do not mark as paid, but add receipt to db
     else:
         memo = (
             f"your stakeBTS payment of {amount} failed for an unknown reason, "
@@ -590,8 +581,9 @@ def payment_child(params, keys):
             + f"BTSstake nonce {nonce} type {params['type']} {number}"
         )
         msg = memo + post_withdrawal_pybitshares(1, client, memo, keys)
-        msg += json_dumps(params)
-        update_receipt_database(nonce, msg)
+
+    msg += json_dumps(params)
+    update_receipt_database(nonce, msg)
 
 
 def payment_cover(params, keys):
@@ -756,7 +748,7 @@ def listener_balances(keys):
     )
     values = (now + 86400 * 1000,)
     curfetchall = sql_db(query, values)
-    due_today = int(sum([i[0] for i in curfetchall]))
+    due_today = int(sum(i[0] for i in curfetchall))
     print(it("purple", "due today"), due_today)
     if due_today > balances[0]:
         print(it("red", "WARN INSUFFICIENT FUNDS IN LOCAL WALLET FOR 24 HOUR EXPENSES"))
