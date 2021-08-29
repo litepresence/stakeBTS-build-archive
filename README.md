@@ -8,8 +8,10 @@
 **3.8+**
 
 `PYTHON REQUIREMENTS`
-**bitshares**
-**uptick**
+
+- bitshares
+- uptick
+- requests
 
 `LICENSE`
 
