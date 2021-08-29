@@ -129,10 +129,11 @@ The bot charges a fee of 50 BTS and returns your funds if:
 - bot ignores bittrex to bmg and vice versa transfer requests if not LTM
 
 `DATABASE`
- 
+```
 CREATE TABLE block (
     block INTEGER           # bitshares block number last checked by bot
 );
+```
 - NOTE all payments *potentially* due
 - are entered into "stakes" TABLE at start of contract
 - as events unfold, their "status", "block", and "processed" time changes
@@ -155,10 +156,12 @@ CREATE TABLE block (
         now INTEGER             # munix moment when event occurred
         msg TEXT                # receipt details for audit trail
     );
-```
+
 INSERT INTO block (block) VALUES (59120000); # the initial starting block
+```
 
 `preexisting_contracts.py and import_data.py`
+
 preexisting_contracts.py houses a single global constant of block text in format:
 username milliseconds_unix amount contract_length months_paid
 can be tab or space delimited, eg:
