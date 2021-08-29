@@ -83,10 +83,9 @@ def post_withdrawal_bittrex(amount, client, api, keys):
             # returns response.json() as dict or list python object
             ret = bittrex_api.post_withdrawal(**params)
             msg += json_dumps(ret)
-            if isinstance(ret, dict):
-                if "code" in ret:
-                    print(it("red", ret), line_info())
-                    raise TypeError("Bittrex failed with response code")
+            if isinstance(ret, dict) and "code" in ret:
+                print(it("red", ret), line_info())
+                raise TypeError("Bittrex failed with response code")
         except Exception as error:
             msg += line_info() + " " + exception_handler(error)
             msg += it("red", f"bittrex failed to send {amount} to client {client}",)

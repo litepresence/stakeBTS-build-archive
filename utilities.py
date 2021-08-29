@@ -20,13 +20,11 @@ def it(style, text, foreground=True):
     """
     Color printing in terminal
     """
-    lie = 4
-    if foreground:
-        lie = 3
+    lie = 3 if foreground else 4
     if isinstance(style, tuple):  # RGB
-        return f"\033[{lie}8;2;{style[0]};{style[1]};{style[2]}m{str(text)}\033[0;00m"
+        return f'\x1b[{lie}8;2;{style[0]};{style[1]};{style[2]}m{text}\x1b[0;00m'
     if isinstance(style, int):  # xterm-256
-        return f"\033[{lie}8;5;{style}m{str(text)}\033[0;00m"
+        return f'\x1b[{lie}8;5;{style}m{text}\x1b[0;00m'
     # 6 color emphasis dict
     emphasis = {
         "red": 91,
@@ -36,7 +34,7 @@ def it(style, text, foreground=True):
         "purple": 95,
         "cyan": 96,
     }
-    return f"\033[{emphasis[style]}m{str(text)}\033[0m"
+    return f'\x1b[{emphasis[style]}m{text}\x1b[0m'
 
 
 def munix():
