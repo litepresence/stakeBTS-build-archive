@@ -1,10 +1,11 @@
-
 # StakeBTS Python Bot
 
 `APP VERSION`
+
 **v2.1**
 
 `PYTHON VERSION`
+
 **3.8+**
 
 `PYTHON REQUIREMENTS`
@@ -15,31 +16,36 @@
 
 `LICENSE`
 
-# BIPCOT v1.2 www.bipcot.org
+## BIPCOT v1.2 www.bipcot.org
 
 `RELEASE STATUS`
 
 ### Unit Tested, Feature Complete Release Candidate
 
 `DESCRIPTION`
+
 Recurring interest and principal payment automation
 for bitsharesmanagement.group to stakeBTS clients
 
 `INTALLATION`
+
 **Install SQLite3:**
+
 ```
 sudo apt install -y sqlite3
 ```
 
-**create database folder**
-**Create stake_bitshares.db**
-**set up the tables with db_setup.py file:**
-**check the schema and that the stake table is empty**
+- create database folder
+- Create stake_bitshares.db
+- set up the tables with db_setup.py file:
+- check the schema and that the stake table is empty
+
 ```
 python3.8 db_setup.py
 ```
 
 **Create and activate environment:**
+
 ```
 sudo apt-get install python3-venv
 python3 -m venv env
@@ -47,16 +53,19 @@ source env/bin/activate
 ```
 
 **Install requirements into environment:**
+
 ```
 pip3 install -r requirements.txt
 ```
 
 **import old client data**
+
 ```
 python3.8 import_data.py
 ```
 
 **Run app**
+
 ```
 python3.8 stake_bitshares.py
 ```
@@ -83,17 +92,18 @@ CHANGELIST v2.0
 - approved admin must be lifetime members of BitShares to run the bot
 
 `NOTES`
-**Account that manager will use for the bot must be imported with all 3 private keys:**
-**(Owner, Active and Memo) into uptick.**
-**On BOT start you will be asked to enter your uptick WALLET password**
-**Bittrex api is used for outbound payments.**
-**You must also have Bittrex API key/secret.**
-**This will be repeated for all 3 Bittrex corporate accounts.**
-**All timestamps are integers in milleseconds**
-**All amounts of funds stored in DB and sent are integers of BTS**
-**Nothing is ever removed from the database**
+- Account that manager will use for the bot must be imported with all 3 private keys:
+- (Owner, Active and Memo) into uptick.
+- On BOT start you will be asked to enter your uptick WALLET password
+- Bittrex api is used for outbound payments.
+- You must also have Bittrex API key/secret.
+- This will be repeated for all 3 Bittrex corporate accounts.
+- All timestamps are integers in milleseconds
+- All amounts of funds stored in DB and sent are integers of BTS
+- Nothing is ever removed from the database
 
 `CLIENT JSON FORMAT`
+
 {"type":"<MEMO OPTIONS>"}
 
 `MEMO OPTIONS`
@@ -106,10 +116,11 @@ CHANGELIST v2.0
  - "bmg_to_bittrex"
  - "bittrex_to_bmg"
  - "loan_to_bmg"
-    
+
 the bot will also accept non json formatted client memos eg; `six_months` would be sufficient
 
 `FEES`
+ 
 The bot charges a fee of 50 BTS and returns your funds if:
 - sending invalid stake amount
 - sending invalid memo
@@ -118,12 +129,14 @@ The bot charges a fee of 50 BTS and returns your funds if:
 - bot ignores bittrex to bmg and vice versa transfer requests if not LTM
 
 `DATABASE`
+ 
 CREATE TABLE block (
     block INTEGER           # bitshares block number last checked by bot
 );
 - NOTE all payments *potentially* due
 - are entered into "stakes" TABLE at start of contract
 - as events unfold, their "status", "block", and "processed" time changes
+```
     CREATE TABLE stakes (
         user TEXT               # bitshares user name for client
         token TEXT              # bitshares asset name
@@ -142,6 +155,7 @@ CREATE TABLE block (
         now INTEGER             # munix moment when event occurred
         msg TEXT                # receipt details for audit trail
     );
+```
 INSERT INTO block (block) VALUES (59120000); # the initial starting block
 
 `preexisting_contracts.py and import_data.py`
@@ -155,9 +169,8 @@ can be tab or space delimited, eg:
 import_data.py moves those existing contracts to the database in the same
 manner as all other contracts thereafter.
 
-`
-DISCUSSION
-`
+`DISCUSSION`
+ ```
 The stakeBTS is 2 listeners with withdrawal priviledges
 communicating via sql database.
 1) bitshares block operation listener:
@@ -236,11 +249,11 @@ and return principal less penalty as it would with any other stake.
 Once the main bot is running
 it won't know the difference between old contracts and new.
 it just sees "pending" vs "paid/aborted" line items
-
+```
+                                                
 `RESET DATABASE`
 
 - `python3.8 db_setup.py`
-
 
 `UNIT TESTING CHECKLIST`
 
@@ -322,13 +335,15 @@ Conduct an security review commensurate with your investment.
 `SPONSOR`
 
 This software is sponsored and managed by BitShares Management Group Limited
+                                                
 - www.bitshares.org
 
 `DEVELOPERS`
 
 v1.0 initial prototype
+                                                
 - iamredbar: iamredbar@protonmail.com
 
 v2.0 refactor, refinement, added features
+                                                
 - litepresence: finitestate@tutamail.com
-
